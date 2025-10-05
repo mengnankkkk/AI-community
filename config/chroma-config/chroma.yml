@@ -1,0 +1,40 @@
+# ChromaDB服务器配置文件
+# 用于AI虚拟播客工作室的向量数据库配置
+
+# 认证配置
+chroma_server_authn_provider: chromadb.auth.basic.BasicAuthenticationServerProvider
+chroma_server_authn_credentials_file: /chroma/server.htpasswd
+
+# 数据存储配置
+chroma_server_host: 0.0.0.0
+chroma_server_http_port: 8000
+chroma_server_grpc_port: 50051
+
+# 性能配置
+chroma_collection_max_size: 1000000
+chroma_segment_max_size: 100000
+
+# 日志配置
+log_level: INFO
+log_config:
+  version: 1
+  disable_existing_loggers: false
+  formatters:
+    default:
+      format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: INFO
+      formatter: default
+  root:
+    level: INFO
+    handlers: [console]
+
+# 存储配置
+persist_directory: /chroma/chroma
+anonymized_telemetry: false
+
+# API配置
+chroma_api_impl: chromadb.api.fastapi.FastAPI
+chroma_server_api_default_path: /api/v1

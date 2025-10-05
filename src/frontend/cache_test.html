@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>缓存清理测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-item {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .pass {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 前端缓存清理测试</h1>
+
+    <div class="info test-item">
+        <h3>当前问题：</h3>
+        <ul>
+            <li>✗ 422错误 - 数据验证失败</li>
+            <li>✗ 角色卡片还有图片按钮</li>
+            <li><strong>原因：浏览器缓存了旧的script.js文件</strong></li>
+        </ul>
+    </div>
+
+    <div class="test-item" style="border: 2px solid #ffc107; background: #fff3cd;">
+        <h3>⚠️ 立即执行清理步骤：</h3>
+        <ol>
+            <li><strong>硬刷新页面（清除缓存）</strong>
+                <ul>
+                    <li>Windows: <code>Ctrl + Shift + R</code> 或 <code>Ctrl + F5</code></li>
+                    <li>Mac: <code>Cmd + Shift + R</code></li>
+                </ul>
+            </li>
+            <li><strong>或者手动清除缓存：</strong>
+                <ul>
+                    <li>Chrome: F12 → Network标签 → 右键 → Clear browser cache</li>
+                    <li>或者：设置 → 隐私和安全 → 清除浏览数据 → 缓存的图像和文件</li>
+                </ul>
+            </li>
+            <li><strong>重新加载主页</strong></li>
+        </ol>
+        <button class="btn-primary" onclick="location.href='index.html?v=2.0&t=' + Date.now()">
+            🔄 强制刷新主页
+        </button>
+    </div>
+
+    <div class="test-item" id="testResult">
+        <h3>📋 验证清单：</h3>
+        <button class="btn-primary" onclick="runTests()">运行测试</button>
+        <div id="results"></div>
+    </div>
+
+    <div class="test-item">
+        <h3>🎯 预期效果：</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr style="background: #f8f9fa;">
+                <th style="border: 1px solid #dee2e6; padding: 8px;">项目</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">修改前</th>
+                <th style="border: 1px solid #dee2e6; padding: 8px;">修改后</th>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">角色姓名</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[输入框] [📷图片]</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[输入框]</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">音色描述</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[输入框] [📷图片]</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[输入框]</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">语气风格</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">❌ 不存在</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">✅ [输入框] + 提示</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">人设/身份</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[文本框] [📷图片]</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[文本框]</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">核心观点</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[文本框] [📷图片]</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[文本框]</td>
+            </tr>
+            <tr style="background: #d4edda;">
+                <td style="border: 1px solid #dee2e6; padding: 8px;"><strong>背景资料</strong></td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[文本框] [🎤ASR]</td>
+                <td style="border: 1px solid #dee2e6; padding: 8px;">[文本框] [📷图片]</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="test-item info">
+        <h3>🐛 如果问题仍然存在：</h3>
+        <ol>
+            <li>完全关闭浏览器，重新打开</li>
+            <li>使用无痕/隐私模式测试</li>
+            <li>检查开发者工具Network标签，确认script.js?v=2.0已加载</li>
+            <li>检查Console是否有JS错误</li>
+        </ol>
+    </div>
+
+    <script>
+        function runTests() {
+            const results = document.getElementById('results');
+            results.innerHTML = '<h4>测试结果：</h4>';
+
+            let html = '';
+
+            // 测试1：检查是否能访问script.js
+            html += '<div class="test-item pass">';
+            html += '<strong>✓ 测试页面正常加载</strong><br>';
+            html += '时间戳: ' + new Date().toLocaleString();
+            html += '</div>';
+
+            // 测试2：模拟collectFormData检查
+            html += '<div class="test-item info">';
+            html += '<strong>数据收集测试</strong><br>';
+            html += '请前往主页，打开浏览器控制台（F12），运行以下命令：<br>';
+            html += '<pre>addCharacter();\n';
+            html += 'document.getElementById("name-1").value = "测试";\n';
+            html += 'document.getElementById("voice-1").value = "测试";\n';
+            html += 'document.getElementById("tone-1").value = "测试";\n';
+            html += 'document.getElementById("persona-1").value = "测试";\n';
+            html += 'document.getElementById("viewpoint-1").value = "测试";\n';
+            html += 'console.log(collectFormData());</pre>';
+            html += '预期输出应该包含 <code>tone_description: "测试"</code>';
+            html += '</div>';
+
+            // 测试3：角色卡片HTML检查
+            html += '<div class="test-item info">';
+            html += '<strong>角色卡片检查</strong><br>';
+            html += '在主页添加一个角色后，检查HTML中是否还有：<br>';
+            html += '<code>startImageUpload(\'name-</code> ← 应该<strong>不存在</strong><br>';
+            html += '<code>id="tone-1"</code> ← 应该<strong>存在</strong>';
+            html += '</div>';
+
+            results.innerHTML += html;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 项目特定目录
+# 音频输出
+audio_output/*
+!audio_output/.gitkeep
+
+# 临时文件
+logs/*
+!logs/.gitkeep
+uploads/*
+!uploads/.gitkeep
+data/temp/*
+!data/temp/.gitkeep
+data/output/*
+!data/output/.gitkeep
+
+# 模型和样本（本地开发用）
+checkpoints/*
+!checkpoints/.gitkeep
+emotion_samples/*
+!emotion_samples/.gitkeep
+
+# 音效和背景音乐（可选资源）
+audio_effects/*
+!audio_effects/.gitkeep
+background_music/*
+!background_music/.gitkeep
+assets/*
+!assets/.gitkeep
+
+# 配置文件（包含敏感信息）
+.env
+*.env.local
+
+# 知识库（可能包含大文件）
+knowledge_base/*
+!knowledge_base/.gitkeep
+!knowledge_base/README.md
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# ChromaDB
+data/knowledge_base/chroma_db/*
+
+# Claude 临时文件
+.claude/
+
+# 系统文件
+Thumbs.db
+nul
+*.log
+
+# Docker
+docker-compose.override.yml
