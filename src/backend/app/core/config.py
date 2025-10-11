@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     rag_embedding_model: str = "text-embedding-ada-002"
     knowledge_base_dir: str = "data/knowledge_base"
     vector_store_dir: str = "data/knowledge_base/chroma_db"
+    rag_auto_ingest: bool = True
+    rag_auto_ingest_patterns: str = "**/*.md,**/*.txt,**/*.pdf,**/*.docx,**/*.json"
+    rag_max_initial_files: int = 100
 
     # 文件存储配置
     audio_output_dir: str = "data/output/audio"

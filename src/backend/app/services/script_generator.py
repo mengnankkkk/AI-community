@@ -560,19 +560,20 @@ class ScriptGenerator:
 }}
 ```
 
-## 输出格式
-严格的JSON格式：
+## 输出要求
+- 仅输出一个JSON对象，键名使用双引号，外层字段必须为"dialogues"。
+- "dialogues"值是一个包含3-4段对话的数组，每段提供"character_name"、"content"、"emotion"。
+- 禁止输出除JSON以外的任何文字、注释或Markdown代码块（包括```json）。
+- 如无法满足要求，请返回结构化错误JSON: {{"error": "原因"}}。
+
+示例格式（请勿输出示例本身）：
 {{
   "dialogues": [
-    {{
-      "character_name": "角色名",
-      "content": "纯对话内容（不含任何提示词）",
-      "emotion": "情感标注"
-    }}
+    {{"character_name": "角色名", "content": "对话", "emotion": "情感"}}
   ]
 }}
 
-请开始创作开场白和第一轮对话："""
+现在只输出符合要求的JSON："""
 
     def generate_continue_prompt(self, form: PodcastCustomForm, next_speaker: str,
                                 rag_context: Dict[str, Any] = None) -> str:
@@ -623,19 +624,20 @@ class ScriptGenerator:
 - **绝对不能包含**：情绪词、语气描述、舞台指示、动作描述、括号标注等
 - 只写角色实际说出的话
 
-## 输出格式
-严格的JSON格式：
+## 输出要求
+- 仅输出一个JSON对象，顶层字段为"dialogues"，其值是数组且包含2-3段对话。
+- 所有字符串使用双引号，不得包含换行外的额外字符或转义失败内容。
+- 禁止输出除JSON外的任何前后缀、解释或Markdown代码块。
+- 如无法生成有效对话，请输出{{"error": "原因"}}。
+
+示例结构（勿直接输出）：
 {{
   "dialogues": [
-    {{
-      "character_name": "角色名",
-      "content": "纯对话内容（不含任何提示词）",
-      "emotion": "情感标注"
-    }}
+    {{"character_name": "{next_speaker}", "content": "对话", "emotion": "情感"}}
   ]
 }}
 
-请继续对话："""
+仅返回符合要求的JSON："""
 
     async def generate_script(self, form: PodcastCustomForm) -> PodcastScript:
         """使用状态化循环生成机制生成播客剧本（集成RAG知识检索）"""
@@ -651,6 +653,7 @@ class ScriptGenerator:
         rag_context = None
         if getattr(settings, 'rag_enabled', False):
             try:
+                await self.rag_service.ensure_ready()
                 print(f"[RAG] 正在检索相关知识: {form.topic}")
                 character_names = [char.name for char in form.characters]
                 rag_context = await self.rag_service.get_podcast_context(form.topic, character_names)
@@ -818,14 +821,15 @@ class ScriptGenerator:
 
 **content字段**：必须是纯粹的对话内容，不能包含任何情绪词、语气描述等提示词
 
-## 输出格式
+## 输出要求
+- 仅返回一个JSON对象，顶层字段为"dialogues"，其中只包含一条结束语。
+- 使用双引号且不返回除JSON外的任何文本或Markdown代码块。
+- 如遇异常，请输出{{"error": "原因"}}。
+
+结构示例（请勿复制）：
 {{
   "dialogues": [
-    {{
-      "character_name": "{host_name}",
-      "content": "纯对话内容（不含任何提示词）",
-      "emotion": "温暖"
-    }}
+    {{"character_name": "{host_name}", "content": "结束语", "emotion": "温暖"}}
   ]
 }}"""
 

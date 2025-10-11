@@ -89,6 +89,188 @@ body {
     font-size: 1.1rem;
 }
 
+.btn-outline-light {
+    color: #ffffff;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(6px);
+}
+
+.btn-outline-light:hover {
+    color: var(--primary-color);
+    background-color: #ffffff;
+}
+
+/* Hero 区域 */
+.hero-banner {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 32px;
+    padding: 3.5rem 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
+}
+
+.hero-banner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.4), transparent 55%);
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 3rem;
+    align-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.hero-copy {
+    color: #ffffff;
+}
+
+.hero-copy h1 {
+    font-size: clamp(2.4rem, 4vw, 3.4rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.hero-copy h1 strong {
+    color: #ffd166;
+}
+
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    padding: 0.35rem 1rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.04em;
+    margin-bottom: 1rem;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 2rem 0 2.5rem;
+}
+
+.hero-metrics {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.hero-metrics .metric-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 120px;
+}
+
+.hero-metrics .metric-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.hero-metrics .metric-label {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.hero-visual {
+    display: flex;
+    justify-content: center;
+}
+
+.hero-card {
+    position: relative;
+    width: min(360px, 90%);
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 2.5rem 2rem;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hero-wave {
+    position: absolute;
+    inset: -60% -50% auto;
+    height: 220px;
+    background: radial-gradient(circle at 20% 20%, rgba(102, 126, 234, 0.4), transparent 65%);
+    z-index: 0;
+}
+
+.hero-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.2));
+    display: grid;
+    place-items: center;
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 1;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hero-timeline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.25rem;
+    position: relative;
+    z-index: 1;
+    font-size: 0.9rem;
+    color: #fff;
+}
+
+.hero-timeline span i {
+    margin-right: 0.35rem;
+    color: #ffd166;
+}
+
+.hero-caption {
+    position: relative;
+    z-index: 1;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 991px) {
+    .hero-banner {
+        padding: 2.5rem 1.5rem;
+    }
+
+    .hero-actions {
+        justify-content: center;
+    }
+
+    .hero-metrics {
+        justify-content: center;
+    }
+
+    .hero-copy {
+        text-align: center;
+    }
+
+    .hero-visual {
+        justify-content: center;
+    }
+}
+
 /* 卡片样式 */
 .card {
     border: none;
@@ -132,6 +314,179 @@ body {
 
 .card-body {
     padding: 2rem;
+}
+
+/* 知识库与素材上传 */
+.knowledge-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.knowledge-dropzone {
+    border: 2px dashed rgba(102, 126, 234, 0.4);
+    border-radius: 20px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.65);
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.knowledge-dropzone:hover,
+.knowledge-dropzone.drag-active {
+    border-color: rgba(102, 126, 234, 0.7);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 15px 35px rgba(102, 126, 234, 0.15);
+}
+
+.knowledge-dropzone .dropzone-icon {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 0.75rem;
+}
+
+.knowledge-dropzone h6 {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.knowledge-dropzone p {
+    margin-bottom: 1rem;
+}
+
+.knowledge-dropzone .btn-light {
+    background: #ffffff;
+    border: 1px solid rgba(102, 126, 234, 0.35);
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.knowledge-dropzone .btn-light:hover {
+    background: var(--primary-color);
+    color: #ffffff;
+    border-color: var(--primary-color);
+}
+
+.upload-progress {
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    min-height: 1.1rem;
+    transition: var(--transition);
+}
+
+.upload-progress.success {
+    color: var(--success-color);
+}
+
+.upload-progress.error {
+    color: var(--error-color);
+}
+
+.upload-progress.warning {
+    color: var(--warning-color);
+}
+
+.knowledge-status-card {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 18px;
+    padding: 1.25rem;
+    border: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0.5rem;
+}
+
+.status-row.ready {
+    border-left: 4px solid var(--success-color);
+    background: rgba(72, 187, 120, 0.12);
+}
+
+.status-row.empty {
+    border-left: 4px solid var(--warning-color);
+    background: rgba(237, 137, 54, 0.12);
+}
+
+.status-row.error {
+    border-left: 4px solid var(--error-color);
+    background: rgba(245, 101, 101, 0.12);
+}
+
+.status-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: rgba(102, 126, 234, 0.12);
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+.status-row.ready .status-icon {
+    background: rgba(72, 187, 120, 0.18);
+    color: var(--success-color);
+}
+
+.status-row.empty .status-icon {
+    background: rgba(237, 137, 54, 0.18);
+    color: var(--warning-color);
+}
+
+.status-row.error .status-icon {
+    background: rgba(245, 101, 101, 0.18);
+    color: var(--error-color);
+}
+
+.status-info .status-label {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.status-info .status-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.knowledge-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+}
+
+.knowledge-metrics .metric-card {
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 16px;
+    padding: 1rem 1.2rem;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 10px 24px rgba(148, 163, 184, 0.12);
+}
+
+.knowledge-metrics .metric-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.knowledge-metrics .metric-value {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.panel-highlight {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.35);
+    border-radius: 24px;
+    transition: box-shadow 0.4s ease;
 }
 
 /* 分节标题 */

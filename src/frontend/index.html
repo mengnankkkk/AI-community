@@ -58,8 +58,49 @@
             </div>
         </nav>
 
+        <!-- Hero 区域 -->
+        <section class="hero-banner my-4">
+            <div class="container hero-content">
+                <div class="hero-copy">
+                    <span class="hero-badge"><i class="fas fa-bolt"></i> 全流程 AI 播客工厂</span>
+                    <h1>一键生成 <strong>沉浸式</strong> 智能播客</h1>
+                    <p>从知识检索、剧本构思到情感配音与音效混音，全流程自动化，让创意无需等待。</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary" onclick="scrollToForm()"><i class="fas fa-microphone-alt me-2"></i>开始创作</button>
+                        <button class="btn btn-outline-light" onclick="checkKnowledgeBase()"><i class="fas fa-database me-2"></i>同步知识库</button>
+                    </div>
+                    <div class="hero-metrics">
+                        <div class="metric-item">
+                            <span class="metric-value" id="heroCompletedCount">3.2K+</span>
+                            <span class="metric-label">已生成播客</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value" id="heroKnowledgeCount">0</span>
+                            <span class="metric-label">知识库文档</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value"><i class="fas fa-rocket"></i></span>
+                            <span class="metric-label">异步排队极速生成</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="hero-card">
+                        <div class="hero-wave"></div>
+                        <div class="hero-avatar"><i class="fas fa-headphones"></i></div>
+                        <div class="hero-timeline">
+                            <span><i class="fas fa-pen-nib"></i> 剧本</span>
+                            <span><i class="fas fa-volume-up"></i> 合成</span>
+                            <span><i class="fas fa-check"></i> 完成</span>
+                        </div>
+                        <p class="hero-caption">实时可视化生成进度，在线审阅剧本与音频，立即下载成品播客。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- 主要内容区域 -->
-        <div class="container">
+        <div class="container" id="formAnchor">
             <div class="row">
                 <!-- 左侧：播客定制单 -->
                 <div class="col-lg-8">
@@ -204,44 +245,64 @@
                                 <!-- 补充素材 -->
                                 <div class="section-title">
                                     <h5><i class="fas fa-file-alt me-2"></i>补充素材（可选）</h5>
-                                    <div class="d-flex gap-2">
+                                    <div class="d-flex gap-2 align-items-center">
                                         <button type="button" class="btn btn-sm btn-outline-info" onclick="toggleKnowledgeBase()">
-                                            <i class="fas fa-database"></i> 知识库
+                                            <i class="fas fa-database"></i> 知识库概览
                                         </button>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" onclick="uploadFile()">
-                                            <i class="fas fa-upload"></i> 上传
+                                            <i class="fas fa-folder-open"></i> 浏览文件
                                         </button>
                                     </div>
                                 </div>
 
-                                <!-- 知识库状态 -->
-                                <div class="knowledge-status mb-3" id="knowledgeStatus">
-                                    <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
-                                        <div>
-                                            <i class="fas fa-database text-primary me-2"></i>
-                                            <span class="fw-medium">RAG知识库状态</span>
-                                        </div>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="checkKnowledgeBase()">
-                                            <i class="fas fa-sync"></i> 检查
+                                <div class="knowledge-panel">
+                                    <div class="knowledge-dropzone" id="knowledgeDropzone">
+                                        <input type="file" id="knowledgeFileInput" accept=".txt,.md,.pdf,.docx,.json" multiple hidden>
+                                        <div class="dropzone-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                                        <h6>拖放或点击上传知识文件</h6>
+                                        <p class="text-muted small mb-2">支持 txt / md / pdf / docx / json，单次最多 10 个文件</p>
+                                        <button type="button" class="btn btn-light btn-sm" onclick="uploadFile()">
+                                            <i class="fas fa-plus me-1"></i>选择文件
                                         </button>
+                                        <div class="upload-progress" id="knowledgeUploadStatus"></div>
+                                    </div>
+
+                                    <div class="knowledge-status-card" id="knowledgeStatus">
+                                        <div class="status-row">
+                                            <div class="status-icon"><i class="fas fa-database"></i></div>
+                                            <div class="status-info">
+                                                <span class="status-label">RAG 知识库</span>
+                                                <p class="status-text mb-0">同步本地资料以增强播客内容的深度与准确性。</p>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="checkKnowledgeBase()">
+                                                <i class="fas fa-sync"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="knowledge-metrics" id="knowledgeSummary">
+                                        <div class="metric-card">
+                                            <span class="metric-title">文档总数</span>
+                                            <span class="metric-value" data-field="documents">--</span>
+                                        </div>
+                                        <div class="metric-card">
+                                            <span class="metric-title">向量库大小</span>
+                                            <span class="metric-value" data-field="size">--</span>
+                                        </div>
+                                        <div class="metric-card">
+                                            <span class="metric-title">最新来源</span>
+                                            <span class="metric-value" data-field="latest">--</span>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label for="backgroundMaterials" class="form-label">背景资料/观点文章</label>
-                                    <div class="position-relative">
-                                        <textarea class="form-control" id="backgroundMaterials" rows="4"
-                                                  placeholder="请在这里粘贴您希望AI参考的相关文章链接、文本段落或数据"></textarea>
-                                        <button class="btn btn-outline-success image-btn position-absolute" type="button"
-                                                onclick="startImageUpload('backgroundMaterials')"
-                                                title="上传图片分析内容"
-                                                style="top: 8px; right: 8px; z-index: 10;">
-                                            <i class="fas fa-image" id="image-icon-backgroundMaterials"></i>
-                                        </button>
-                                    </div>
+                                    <label for="backgroundMaterials" class="form-label">背景资料 / 观点文章</label>
+                                    <textarea class="form-control" id="backgroundMaterials" rows="4"
+                                              placeholder="粘贴参考链接、文章片段或要点列表，AI 将结合知识库深度创作"></textarea>
                                     <div class="form-text">
                                         <i class="fas fa-lightbulb text-warning me-1"></i>
-                                        提供相关资料可以让播客内容更加丰富和有据可依。支持网页链接、文档内容等。点击📷图片按钮可上传图片分析内容。
+                                        提供上下文让播客更加专业可信，可粘贴长文档摘要或关键论点。
                                     </div>
                                 </div>
 

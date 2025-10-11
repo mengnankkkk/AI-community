@@ -5,6 +5,7 @@ from typing import Dict, Any
 from ..models.podcast import PodcastCustomForm, PodcastScript, PodcastGenerationResponse
 from .script_generator import ScriptGenerator
 from .tts_service import TTSService
+from ..core.config import settings
 
 class PodcastTask:
     def __init__(self, task_id: str, form: PodcastCustomForm):
@@ -20,17 +21,43 @@ class TaskManager:
         self.tasks: Dict[str, PodcastTask] = {}
         self.script_generator = ScriptGenerator()
         self.tts_service = TTSService()
+        self.queue: asyncio.Queue = asyncio.Queue()
+        self.workers_started = False
+        self.worker_count = max(1, getattr(settings, 'task_worker_count', 2))
 
-    def create_task(self, form: PodcastCustomForm) -> str:
+    async def create_task(self, form: PodcastCustomForm) -> str:
         """创建新的播客生成任务"""
         task_id = str(uuid.uuid4())
         task = PodcastTask(task_id, form)
+        task.status = "queued"
         self.tasks[task_id] = task
-
-        # 异步启动任务
-        asyncio.create_task(self._execute_task(task_id))
-
+        await self.queue.put(task_id)
+        self._ensure_workers()
         return task_id
+
+    def _ensure_workers(self):
+        if self.workers_started:
+            return
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.get_event_loop()
+
+        for _ in range(self.worker_count):
+            loop.create_task(self._worker())
+
+        self.workers_started = True
+
+    async def _worker(self):
+        while True:
+            task_id = await self.queue.get()
+            try:
+                await self._execute_task(task_id)
+            except Exception as worker_error:
+                print(f"[{task_id}] 任务执行异常: {str(worker_error)}")
+            finally:
+                self.queue.task_done()
 
     async def _execute_task(self, task_id: str):
         """执行播客生成任务"""

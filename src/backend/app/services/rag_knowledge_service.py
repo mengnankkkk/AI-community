@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 import aiohttp
@@ -26,8 +27,10 @@ class RAGKnowledgeService:
     """RAG知识库检索服务"""
 
     def __init__(self):
-        self.knowledge_base_dir = "knowledge_base"
-        self.vector_store_dir = os.path.join(self.knowledge_base_dir, "chroma_db")
+
+        self.project_root = Path(__file__).resolve().parents[3]
+        self.knowledge_base_dir = (self.project_root / settings.knowledge_base_dir).resolve()
+        self.vector_store_dir = (self.project_root / settings.vector_store_dir).resolve()
 
         # 创建必要目录
         os.makedirs(self.knowledge_base_dir, exist_ok=True)
@@ -48,6 +51,9 @@ class RAGKnowledgeService:
         # 向量数据库
         self.vectorstore = None
         self.retriever = None
+        self._initial_corpus_loaded = False
+        self._load_lock = None
+        self._auto_patterns = [pattern.strip() for pattern in settings.rag_auto_ingest_patterns.split(',') if pattern.strip()]
 
         # 支持的文件类型
         self.supported_extensions = {'.txt', '.md', '.pdf', '.docx', '.json'}
@@ -56,7 +62,7 @@ class RAGKnowledgeService:
         """初始化向量数据库"""
         try:
             self.vectorstore = Chroma(
-                persist_directory=self.vector_store_dir,
+                persist_directory=str(self.vector_store_dir),
                 embedding_function=self.embeddings
             )
             self.retriever = self.vectorstore.as_retriever(
@@ -64,17 +70,92 @@ class RAGKnowledgeService:
                 search_kwargs={"k": 5}  # 返回最相关的5个片段
             )
             logger.info("向量数据库初始化成功")
+
+            if settings.rag_auto_ingest:
+                await self._load_initial_corpus()
+
             return True
         except Exception as e:
             logger.error(f"向量数据库初始化失败: {str(e)}")
             return False
+
+    async def ensure_ready(self):
+        """确保向量数据库和初始语料准备就绪"""
+        if not self.vectorstore:
+            await self.initialize_vectorstore()
+            return
+
+        if settings.rag_auto_ingest and not self._initial_corpus_loaded:
+            await self._load_initial_corpus()
+
+    async def _load_initial_corpus(self):
+        """加载默认知识库目录下的文件"""
+        if self._initial_corpus_loaded:
+            return
+
+        if self._load_lock is None:
+            self._load_lock = asyncio.Lock()
+
+        async with self._load_lock:
+            if self._initial_corpus_loaded:
+                return
+
+            files = self._discover_initial_files()
+            if not files:
+                logger.info("未发现可自动导入的知识库文件")
+                self._initial_corpus_loaded = True
+                return
+
+            logger.info(f"开始自动导入知识库文件，共 {len(files)} 个候选")
+
+            imported = 0
+            max_files = max(0, settings.rag_max_initial_files)
+
+            for file_path in files:
+                if max_files and imported >= max_files:
+                    logger.info(f"达到自动导入上限 {max_files}，停止加载")
+                    break
+
+                success = await self.add_knowledge_from_file(str(file_path))
+                if success:
+                    imported += 1
+
+            logger.info(f"自动导入完成，共成功导入 {imported} 个文件")
+            self._initial_corpus_loaded = True
+
+    def _discover_initial_files(self) -> List[Path]:
+        """根据配置扫描知识库目录中的文件"""
+        if not self.knowledge_base_dir.exists():
+            return []
+
+        matched_paths = []
+        for pattern in self._auto_patterns or ["**/*"]:
+            matched_paths.extend(self.knowledge_base_dir.glob(pattern))
+
+        unique_files = []
+        seen = set()
+        for path in matched_paths:
+            if not path.is_file():
+                continue
+            if path.suffix.lower() not in self.supported_extensions:
+                continue
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            unique_files.append(resolved)
+
+        unique_files.sort()
+        return unique_files
 
     async def add_knowledge_from_text(self, text: str, source: str = "manual_input",
                                     metadata: Dict[str, Any] = None) -> bool:
         """从文本添加知识"""
         try:
             if not self.vectorstore:
-                await self.initialize_vectorstore()
+                success = await self.initialize_vectorstore()
+                if not success:
+                    return False
 
             # 分割文本
             documents = self.text_splitter.create_documents(
@@ -143,11 +224,12 @@ class RAGKnowledgeService:
     async def add_knowledge_from_file(self, file_path: str) -> bool:
         """从文件添加知识"""
         try:
-            if not os.path.exists(file_path):
+            path = Path(file_path)
+            if not path.exists():
                 logger.error(f"文件不存在: {file_path}")
                 return False
 
-            file_ext = os.path.splitext(file_path)[1].lower()
+            file_ext = path.suffix.lower()
 
             if file_ext not in self.supported_extensions:
                 logger.error(f"不支持的文件类型: {file_ext}")
@@ -156,27 +238,27 @@ class RAGKnowledgeService:
             text = ""
             metadata = {
                 "type": "file",
-                "file_path": file_path,
+                "file_path": str(path),
                 "file_type": file_ext
             }
 
             # 根据文件类型提取文本
             if file_ext == '.txt':
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with path.open('r', encoding='utf-8') as f:
                     text = f.read()
 
             elif file_ext == '.md':
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with path.open('r', encoding='utf-8') as f:
                     text = f.read()
 
             elif file_ext == '.pdf':
-                text = self._extract_pdf_text(file_path)
+                text = self._extract_pdf_text(str(path))
 
             elif file_ext == '.docx':
-                text = self._extract_docx_text(file_path)
+                text = self._extract_docx_text(str(path))
 
             elif file_ext == '.json':
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with path.open('r', encoding='utf-8') as f:
                     data = json.load(f)
                     text = json.dumps(data, ensure_ascii=False, indent=2)
 
@@ -185,7 +267,7 @@ class RAGKnowledgeService:
                 return False
 
             metadata["length"] = len(text)
-            return await self.add_knowledge_from_text(text, source=file_path, metadata=metadata)
+            return await self.add_knowledge_from_text(text, source=str(path), metadata=metadata)
 
         except Exception as e:
             logger.error(f"从文件添加知识失败 {file_path}: {str(e)}")
@@ -220,7 +302,7 @@ class RAGKnowledgeService:
         """搜索相关知识"""
         try:
             if not self.retriever:
-                await self.initialize_vectorstore()
+                await self.ensure_ready()
 
             if not self.retriever:
                 logger.warning("向量数据库未初始化，无法进行检索")
@@ -249,6 +331,8 @@ class RAGKnowledgeService:
     async def get_podcast_context(self, topic: str, characters: List[str] = None) -> Dict[str, Any]:
         """为播客主题获取相关上下文"""
         try:
+            await self.ensure_ready()
+
             # 构建搜索查询
             search_queries = [topic]
 
@@ -348,7 +432,17 @@ class RAGKnowledgeService:
         """获取知识库统计信息"""
         try:
             if not self.vectorstore:
-                await self.initialize_vectorstore()
+                await self.ensure_ready()
+
+            if not self.vectorstore:
+                return {
+                    "status": "not_initialized",
+                    "document_count": 0,
+                    "total_documents": 0,
+                    "database_size_mb": 0.0,
+                    "vector_store_path": str(self.vector_store_dir),
+                    "embedding_model": settings.rag_embedding_model
+                }
 
             # 获取文档数量
             collection = self.vectorstore._collection
@@ -356,15 +450,16 @@ class RAGKnowledgeService:
 
             # 获取数据库大小
             db_size = 0
-            if os.path.exists(self.vector_store_dir):
-                for root, dirs, files in os.walk(self.vector_store_dir):
-                    for file in files:
-                        db_size += os.path.getsize(os.path.join(root, file))
+            if self.vector_store_dir.exists():
+                for file in self.vector_store_dir.glob("**/*"):
+                    if file.is_file():
+                        db_size += file.stat().st_size
 
             stats = {
                 "document_count": doc_count,
+                "total_documents": doc_count,
                 "database_size_mb": round(db_size / (1024 * 1024), 2),
-                "vector_store_path": self.vector_store_dir,
+                "vector_store_path": str(self.vector_store_dir),
                 "embedding_model": "OpenAI text-embedding-ada-002",
                 "status": "ready" if self.vectorstore else "not_initialized"
             }
@@ -378,14 +473,15 @@ class RAGKnowledgeService:
     async def clear_knowledge_base(self) -> bool:
         """清空知识库"""
         try:
-            if os.path.exists(self.vector_store_dir):
+            if self.vector_store_dir.exists():
                 import shutil
                 shutil.rmtree(self.vector_store_dir)
-                os.makedirs(self.vector_store_dir, exist_ok=True)
+                self.vector_store_dir.mkdir(parents=True, exist_ok=True)
 
             # 重新初始化
             self.vectorstore = None
             self.retriever = None
+            self._initial_corpus_loaded = False
             await self.initialize_vectorstore()
 
             logger.info("知识库清空成功")

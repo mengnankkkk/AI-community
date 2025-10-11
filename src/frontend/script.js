@@ -4,6 +4,12 @@ let characterCount = 0;
 let currentTaskId = null;
 let statusCheckInterval = null;
 let isGenerating = false;
+let knowledgeState = {
+    stats: null,
+    lastSource: '--',
+    isUploading: false
+};
+let knowledgeUploadElements = {};
 
 // API基础URL
 const API_BASE_URL = '/api/v1';
@@ -38,8 +44,8 @@ function initializeApp() {
     // 初始化工具提示
     initializeTooltips();
 
-    // 检查知识库状态
-    checkKnowledgeBase();
+    // 初始化知识库上传与状态
+    initializeKnowledgeUpload();
 
     // 添加输入验证
     addInputValidation();
@@ -47,8 +53,154 @@ function initializeApp() {
     // 初始化主题建议
     initializeTopicSuggestions();
 
+    // 同步知识库并刷新指标
+    checkKnowledgeBase();
+
     // 显示欢迎提示
     showWelcomeToast();
+}
+
+function scrollToForm() {
+    const anchor = document.getElementById('formAnchor');
+    if (anchor) {
+        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function initializeKnowledgeUpload() {
+    const dropzone = document.getElementById('knowledgeDropzone');
+    const fileInput = document.getElementById('knowledgeFileInput');
+    const status = document.getElementById('knowledgeUploadStatus');
+
+    if (!dropzone || !fileInput) {
+        return;
+    }
+
+    knowledgeUploadElements = { dropzone, fileInput, status };
+
+    dropzone.addEventListener('click', (event) => {
+        if (!event.target.closest('button')) {
+            fileInput.click();
+        }
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzone.classList.add('drag-active');
+        });
+    });
+
+    ['dragleave', 'dragend', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzone.classList.remove('drag-active');
+        });
+    });
+
+    dropzone.addEventListener('drop', (event) => {
+        const files = event.dataTransfer?.files;
+        if (files && files.length) {
+            handleKnowledgeFiles(files);
+        }
+    });
+
+    fileInput.addEventListener('change', (event) => {
+        const files = event.target.files;
+        if (files && files.length) {
+            handleKnowledgeFiles(files);
+            fileInput.value = '';
+        }
+    });
+}
+
+async function handleKnowledgeFiles(fileList) {
+    if (knowledgeState.isUploading) {
+        showToast('知识文件正在上传，请稍候...', 'warning');
+        return;
+    }
+
+    const files = Array.from(fileList).slice(0, 10);
+    if (!files.length) {
+        return;
+    }
+
+    if (fileList.length > files.length) {
+        showToast('一次最多上传10个文件，部分文件已暂存', 'warning');
+    }
+
+    const allowedExtensions = ['.txt', '.md', '.pdf', '.docx', '.json'];
+    const filteredFiles = files.filter(file => {
+        const fileName = file.name.toLowerCase();
+        return allowedExtensions.some(ext => fileName.endsWith(ext));
+    });
+
+    if (!filteredFiles.length) {
+        showToast('未检测到支持的文件格式，请选择 txt/md/pdf/docx/json', 'error');
+        return;
+    }
+
+    if (filteredFiles.length !== files.length) {
+        showToast('部分文件类型暂不支持，已自动忽略', 'warning');
+    }
+
+    let hasFailure = false;
+    knowledgeState.isUploading = true;
+    setKnowledgeUploadStatus('正在上传知识文件...', 'info');
+
+    for (let index = 0; index < filteredFiles.length; index++) {
+        const file = filteredFiles[index];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setKnowledgeUploadStatus(`(${index + 1}/${filteredFiles.length}) 上传中：${file.name}`, 'info');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/knowledge/add-file`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const result = await response.json().catch(() => ({ detail: '上传失败' }));
+                throw new Error(result.detail || '上传失败');
+            }
+
+            knowledgeState.lastSource = file.name;
+            renderKnowledgeStatus(knowledgeState.stats);
+            showToast(`知识库已添加：${file.name}`, 'success');
+        } catch (error) {
+            console.error(error);
+            showToast(`上传失败：${error.message}`, 'error');
+            setKnowledgeUploadStatus(`上传失败：${file.name}`, 'error');
+            hasFailure = true;
+        }
+    }
+
+    knowledgeState.isUploading = false;
+    setKnowledgeUploadStatus(hasFailure ? '部分文件上传失败，请稍后重试' : '上传完成', hasFailure ? 'warning' : 'success');
+    await checkKnowledgeBase();
+    setTimeout(() => setKnowledgeUploadStatus('', 'info'), 2500);
+}
+
+function setKnowledgeUploadStatus(message, type = 'info') {
+    const status = knowledgeUploadElements.status;
+    if (!status) {
+        return;
+    }
+
+    if (!message) {
+        status.textContent = '';
+        status.dataset.state = '';
+        status.className = 'upload-progress';
+        return;
+    }
+
+    status.textContent = message;
+    status.dataset.state = type;
+    status.className = `upload-progress ${type}`;
 }
 
 /**
@@ -410,6 +562,7 @@ function updateStatus(status, message, result = null) {
     let progressHtml = '';
 
     switch (status) {
+        case 'queued':
         case 'pending':
             statusClass = 'status-pending';
             icon = 'fas fa-clock';
@@ -468,6 +621,10 @@ function updateProgressSteps(status) {
     // 根据状态更新步骤
     let activeStep = 0;
     switch (status) {
+        case 'queued':
+        case 'pending':
+            activeStep = 1;
+            break;
         case 'generating_script':
             activeStep = 1;
             break;
@@ -507,9 +664,7 @@ function displayResult(result) {
     }
 
     // 显示详细信息
-    if (result.metadata) {
-        displayPodcastInfo(result.metadata);
-    }
+    displayPodcastInfo(result.metadata || {});
 }
 
 /**
@@ -566,6 +721,15 @@ function displayAudioPlayer(audioUrl, script) {
 function displayPodcastInfo(metadata) {
     const podcastInfo = document.getElementById('podcastInfo');
 
+    const ragDocs = knowledgeState.stats
+        ? Number(knowledgeState.stats.document_count ?? knowledgeState.stats.total_documents ?? 0)
+        : 0;
+    const ragDocsLabel = Number.isFinite(ragDocs) ? ragDocs.toLocaleString('zh-CN') : '--';
+
+    const ragStatus = ragDocs > 0
+        ? `已启用（${ragDocsLabel} 篇文档）`
+        : '未启用';
+
     podcastInfo.innerHTML = `
         <div class="podcast-metadata">
             <h6><i class="fas fa-info-circle me-2"></i>播客详情</h6>
@@ -575,6 +739,7 @@ function displayPodcastInfo(metadata) {
                 <li><strong>对话轮次:</strong> ${metadata.dialogue_count || '未知'}轮</li>
                 <li><strong>使用模型:</strong> ${metadata.model_used || '默认模型'}</li>
                 <li><strong>音效类型:</strong> ${metadata.audio_effects || '智能适配'}</li>
+                <li><strong>RAG 知识库:</strong> ${ragStatus}</li>
             </ul>
         </div>
     `;
@@ -673,49 +838,105 @@ async function checkKnowledgeBase() {
         const response = await fetch(`${API_BASE_URL}/knowledge/stats`);
         const stats = await response.json();
 
-        const statusElement = document.getElementById('knowledgeStatus');
-        if (stats.total_documents > 0) {
-            statusElement.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center p-3 bg-success bg-opacity-10 rounded">
-                    <div>
-                        <i class="fas fa-database text-success me-2"></i>
-                        <span class="fw-medium">知识库已就绪 (${stats.total_documents}个文档)</span>
-                    </div>
-                    <button class="btn btn-sm btn-outline-success" onclick="checkKnowledgeBase()">
-                        <i class="fas fa-sync"></i> 刷新
-                    </button>
-                </div>
-            `;
-        } else {
-            statusElement.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center p-3 bg-warning bg-opacity-10 rounded">
-                    <div>
-                        <i class="fas fa-database text-warning me-2"></i>
-                        <span class="fw-medium">知识库为空，可选择添加内容</span>
-                    </div>
-                    <button class="btn btn-sm btn-outline-warning" onclick="toggleKnowledgeBase()">
-                        <i class="fas fa-plus"></i> 添加
-                    </button>
-                </div>
-            `;
-        }
+        knowledgeState.stats = stats;
+        renderKnowledgeStatus(stats);
     } catch (error) {
         console.error('Knowledge base check failed:', error);
+        setKnowledgeUploadStatus('知识库状态获取失败', 'error');
+        showToast('知识库状态获取失败，请稍后重试', 'error');
+        renderKnowledgeStatus({ status: 'error' });
     }
 }
 
-/**
- * 切换知识库面板
- */
-function toggleKnowledgeBase() {
-    showToast('知识库管理功能正在开发中', 'info');
+function renderKnowledgeStatus(stats = {}) {
+    const statusElement = document.getElementById('knowledgeStatus');
+    const summaryElement = document.getElementById('knowledgeSummary');
+    const heroDocElement = document.getElementById('heroKnowledgeCount');
+
+    if (!statusElement) {
+        return;
+    }
+
+    const documentCountRaw = stats.document_count ?? stats.total_documents ?? 0;
+    const documentCount = Number(documentCountRaw) || 0;
+    const documentLabel = Number.isFinite(documentCount) ? documentCount.toLocaleString('zh-CN') : documentCountRaw;
+    const sizeMb = Number(stats.database_size_mb ?? 0);
+    const status = stats.status ?? (documentCount > 0 ? 'ready' : 'not_initialized');
+
+    const statusMap = {
+        ready: {
+            icon: 'fas fa-check-circle',
+            label: '知识库已就绪',
+            tone: 'ready',
+            description: `已索引 ${documentLabel} 个文档`
+        },
+        not_initialized: {
+            icon: 'fas fa-inbox',
+            label: '知识库未初始化',
+            tone: 'empty',
+            description: '上传资料后即可启用知识增强'
+        },
+        error: {
+            icon: 'fas fa-exclamation-triangle',
+            label: '知识库异常',
+            tone: 'error',
+            description: '请检查配置或稍后重试'
+        }
+    };
+
+    const config = statusMap[status] || statusMap.not_initialized;
+
+    statusElement.innerHTML = `
+        <div class="status-row ${config.tone}">
+            <div class="status-icon"><i class="${config.icon}"></i></div>
+            <div class="status-info">
+                <span class="status-label">${config.label}</span>
+                <p class="status-text mb-0">${config.description}</p>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" onclick="checkKnowledgeBase()" title="刷新知识库">
+                <i class="fas fa-sync"></i>
+            </button>
+        </div>
+    `;
+
+    if (summaryElement) {
+        const docField = summaryElement.querySelector('[data-field="documents"]');
+        const sizeField = summaryElement.querySelector('[data-field="size"]');
+        const latestField = summaryElement.querySelector('[data-field="latest"]');
+
+        if (docField) {
+            docField.textContent = documentLabel;
+        }
+        if (sizeField) {
+            sizeField.textContent = Number.isFinite(sizeMb) ? `${sizeMb.toFixed(2)} MB` : '--';
+        }
+        if (latestField) {
+            latestField.textContent = knowledgeState.lastSource || '--';
+        }
+    }
+
+    if (heroDocElement) {
+        heroDocElement.textContent = documentLabel;
+    }
 }
 
-/**
- * 上传文件
- */
+function toggleKnowledgeBase() {
+    const panel = document.querySelector('.knowledge-panel');
+    if (!panel) {
+        return;
+    }
+
+    panel.classList.add('panel-highlight');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => panel.classList.remove('panel-highlight'), 1500);
+    showToast('已定位至知识库区域', 'info');
+}
+
 function uploadFile() {
-    showToast('文件上传功能正在开发中', 'info');
+    const fileInput = document.getElementById('knowledgeFileInput');
+    if (fileInput) {
+        fileInput.click();
+    }
 }
 
 /**

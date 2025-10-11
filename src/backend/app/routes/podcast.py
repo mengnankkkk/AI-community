@@ -17,7 +17,7 @@ async def generate_podcast(request: PodcastGenerationRequest):
             raise HTTPException(status_code=400, detail="至少需要2个角色")
 
         # 创建生成任务
-        task_id = task_manager.create_task(request.custom_form)
+        task_id = await task_manager.create_task(request.custom_form)
 
         return PodcastGenerationResponse(
             task_id=task_id,

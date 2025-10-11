@@ -2,6 +2,7 @@ import openai
 import asyncio
 from typing import List, Dict, Optional
 import os
+import shutil
 from pydub import AudioSegment
 from ..models.podcast import PodcastScript, CharacterRole
 from ..core.config import settings
@@ -128,27 +129,54 @@ class OpenAITTSService:
         for char in characters:
             character_voices[char.name] = self.get_voice_for_character(char.voice_description)
 
-        # 合成每个对话片段
-        audio_files = []
+        # 合成每个对话片段（并发 + 缓存复用）
+        max_concurrency = max(1, getattr(settings, 'tts_max_concurrency', 3))
+        semaphore = asyncio.Semaphore(max_concurrency)
+        segment_cache: Dict[tuple, str] = {}
+        segment_results = []
 
-        for i, dialogue in enumerate(script.dialogues):
+        async def process_segment(index: int, dialogue):
             voice = character_voices.get(dialogue.character_name, "alloy")
-            output_path = os.path.join(task_dir, f"segment_{i:03d}.mp3")
+            output_path = os.path.join(task_dir, f"segment_{index:03d}.mp3")
+            cleaned_text = clean_for_tts(dialogue.content, None)
+            cache_key = (voice, cleaned_text)
 
-            success = await self.synthesize_single_audio(dialogue.content, voice, output_path)
+            if cache_key in segment_cache and os.path.exists(segment_cache[cache_key]):
+                try:
+                    shutil.copyfile(segment_cache[cache_key], output_path)
+                    logger.debug(f"复用缓存音频: segment_{index:03d}")
+                    return index, output_path, True
+                except Exception as copy_error:
+                    logger.warning(f"缓存复制失败，重新合成: {copy_error}")
+
+            async with semaphore:
+                success = await self.synthesize_single_audio(dialogue.content, voice, output_path)
+
             if success:
-                audio_files.append(output_path)
+                segment_cache[cache_key] = output_path
             else:
                 logger.error(f"音频合成失败: {output_path}")
 
-        if not audio_files:
+            return index, output_path, success
+
+        tasks = [asyncio.create_task(process_segment(i, dialogue)) for i, dialogue in enumerate(script.dialogues)]
+
+        for result in await asyncio.gather(*tasks, return_exceptions=True):
+            if isinstance(result, Exception):
+                logger.error(f"音频片段合成任务异常: {result}")
+                continue
+            segment_results.append(result)
+
+        successful_segments = [path for _, path, ok in sorted(segment_results, key=lambda item: item[0]) if ok]
+
+        if not successful_segments:
             raise Exception("所有音频片段合成失败")
 
         # 拼接音频
-        final_audio_path = await self.concatenate_audio(audio_files, task_dir, task_id)
+        final_audio_path = await self.concatenate_audio(successful_segments, task_dir, task_id)
 
         # 清理临时文件
-        for audio_file in audio_files:
+        for audio_file in successful_segments:
             try:
                 os.remove(audio_file)
             except:
