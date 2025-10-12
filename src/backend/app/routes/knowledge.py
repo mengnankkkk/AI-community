@@ -56,19 +56,75 @@ async def add_text_knowledge(
 @router.post("/add-url")
 async def add_url_knowledge(
     url: str = Form(...),
-    max_length: int = Form(10000)
+    max_length: int = Form(50000),
+    strategy: str = Form('auto')
 ):
-    """从URL添加知识"""
+    """
+    从URL添加知识（增强版）
+
+    Args:
+        url: 网页URL
+        max_length: 最大内容长度（默认50000字符）
+        strategy: 抓取策略 ('auto', 'basic', 'advanced', 'browser')
+            - auto: 自动检测最佳策略
+            - basic: 简单静态网页抓取
+            - advanced: JavaScript渲染支持（需要MCP Fetch）
+            - browser: 完整浏览器交互（需要MCP Puppeteer）
+    """
     try:
-        success = await rag_service.add_knowledge_from_url(url, max_length)
+        success = await rag_service.add_knowledge_from_url(url, max_length, strategy)
 
         if success:
-            return {"message": "URL知识添加成功", "url": url}
+            return {
+                "message": "URL知识添加成功",
+                "url": url,
+                "strategy": strategy
+            }
         else:
             raise HTTPException(status_code=500, detail="URL知识添加失败")
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"添加失败: {str(e)}")
+
+@router.post("/add-urls-batch")
+async def add_urls_batch(
+    urls: List[str],
+    strategy: str = 'auto',
+    max_concurrent: int = 3
+):
+    """
+    批量从多个URL添加知识
+
+    Args:
+        urls: URL列表
+        strategy: 抓取策略 ('auto', 'basic', 'advanced', 'browser')
+        max_concurrent: 最大并发数（默认3）
+    """
+    try:
+        if not urls:
+            raise HTTPException(status_code=400, detail="URL列表不能为空")
+
+        if len(urls) > 20:
+            raise HTTPException(status_code=400, detail="单次批量导入最多支持20个URL")
+
+        results = await rag_service.add_knowledge_from_urls_batch(
+            urls=urls,
+            strategy=strategy,
+            max_concurrent=max_concurrent
+        )
+
+        return {
+            "message": "批量URL导入完成",
+            "total": results['total'],
+            "success": results['success'],
+            "failed": results['failed'],
+            "results": results['results']
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"批量导入失败: {str(e)}")
 
 @router.post("/add-file")
 async def add_file_knowledge(file: UploadFile = File(...)):

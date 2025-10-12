@@ -78,9 +78,18 @@ class TaskManager:
                 print(f"[{task_id}] 剧本生成异常详细: {traceback.format_exc()}")
                 raise script_error
 
-            task.status = "generating_audio"
+            # 检查是否需要生成音频
+            enable_audio = getattr(settings, 'enable_audio_generation', False)
 
-            # 2. 生成音频（带音效和BGM）
+            if not enable_audio:
+                # 只生成剧本，不生成音频
+                print(f"[{task_id}] 音频生成已禁用，任务完成（仅剧本）")
+                task.status = "completed"
+                task.audio_path = None  # 明确设置为None
+                return
+
+            # 2. 生成音频（如果启用）
+            task.status = "generating_audio"
             print(f"[{task_id}] 开始生成音频...")
 
             # 根据设置的氛围生成音频
@@ -168,5 +177,22 @@ class TaskManager:
             return self.tasks[task_id].audio_path
         return None
 
-# 全局任务管理器实例
-task_manager = TaskManager()
+# 全局任务管理器实例 - 延迟初始化避免阻塞
+_task_manager_instance = None
+
+def get_task_manager() -> "TaskManager":
+    """获取全局任务管理器实例（延迟初始化）"""
+    global _task_manager_instance
+    if _task_manager_instance is None:
+        _task_manager_instance = TaskManager()
+    return _task_manager_instance
+
+# 为了向后兼容，保留 task_manager 变量但改为属性访问
+class _TaskManagerProxy:
+    def __getattr__(self, name):
+        return getattr(get_task_manager(), name)
+
+    def __call__(self, *args, **kwargs):
+        return get_task_manager()(*args, **kwargs)
+
+task_manager = _TaskManagerProxy()

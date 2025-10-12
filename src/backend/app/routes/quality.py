@@ -16,11 +16,11 @@ from ..core.config import settings
 
 router = APIRouter(prefix="/quality", tags=["quality"])
 
-# 在应用启动时初始化评估服务
-@router.on_event("startup")
-async def startup_event():
-    """应用启动时初始化质量评估服务"""
-    await quality_assessment_service.initialize()
+# 【暂时禁用】在应用启动时初始化评估服务 - 改为延迟初始化避免阻塞
+# @router.on_event("startup")
+# async def startup_event():
+#     """应用启动时初始化质量评估服务"""
+#     await quality_assessment_service.initialize()
 
 @router.post("/assess")
 async def assess_podcast_quality(

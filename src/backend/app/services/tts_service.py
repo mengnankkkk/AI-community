@@ -220,9 +220,32 @@ class TTSService:
         self.qwen3_tts_service = None
         self.nihal_tts_service = None
         self.chatterbox_service = None  # Chatterbox Multilingual TTS
+        self.alicloud_cosyvoice_service = None  # AliCloud CosyVoice
 
     async def get_tts_service(self):
         """获取当前配置的TTS服务"""
+        # AliCloud CosyVoice - 优先级高（国内服务，稳定性好）
+        if self.tts_engine.lower() == 'cosyvoice':
+            if not self.alicloud_cosyvoice_service:
+                try:
+                    from .alicloud_cosyvoice_service import AliCloudCosyVoiceService
+                    self.alicloud_cosyvoice_service = AliCloudCosyVoiceService()
+
+                    # 检查服务是否可用
+                    health = await self.alicloud_cosyvoice_service.health_check()
+                    if health["status"] == "healthy":
+                        logger.info("使用AliCloud CosyVoice引擎")
+                        return self.alicloud_cosyvoice_service
+                    else:
+                        logger.warning(f"AliCloud CosyVoice不可用: {health.get('error', '未知错误')}，回退到Qwen3-TTS")
+                        self.tts_engine = 'qwen3_tts'
+                except ImportError as e:
+                    logger.warning(f"AliCloud CosyVoice服务导入失败: {str(e)}，使用Qwen3-TTS")
+                    self.tts_engine = 'qwen3_tts'
+                except Exception as e:
+                    logger.warning(f"AliCloud CosyVoice服务初始化失败: {str(e)}，使用Qwen3-TTS")
+                    self.tts_engine = 'qwen3_tts'
+
         if self.tts_engine.lower() == 'qwen3_tts':
             if not self.qwen3_tts_service:
                 try:
@@ -432,7 +455,7 @@ class TTSService:
 
     async def switch_engine(self, engine: str) -> bool:
         """切换TTS引擎"""
-        if engine.lower() in ['qwen3_tts', 'chatterbox', 'nihal_tts', 'indextts2', 'indextts2_gradio', 'openai']:
+        if engine.lower() in ['cosyvoice', 'qwen3_tts', 'chatterbox', 'nihal_tts', 'indextts2', 'indextts2_gradio', 'openai']:
             self.tts_engine = engine.lower()
             logger.info(f"TTS引擎切换为: {engine}")
             return True

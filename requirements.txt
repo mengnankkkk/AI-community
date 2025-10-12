@@ -25,14 +25,17 @@ gradio_client>=0.8.0
 # 如需使用，请取消注释以下行：
 # chatterbox-tts>=1.0.0
 
+# AliCloud DashScope (CosyVoice TTS)
+dashscope>=1.14.0
+
 # RAG 知识库依赖
 langchain==0.1.0
 langchain-community==0.0.13
 langchain-openai==0.0.5
 chromadb==0.4.22
-sentence-transformers==2.2.2
+sentence-transformers>=5.1.1  # 升级到5.1.1修复huggingface_hub兼容性问题
 beautifulsoup4==4.12.2
-pypdf==3.17.4
+pypdf==3.17.4  # PyPDF2的继任者
 python-docx==1.1.0
 markdown==3.5.2
 tiktoken==0.5.2

@@ -21,10 +21,10 @@ class Settings(BaseSettings):
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_model: str = "gemini-2.5-flash"
 
-    # DeepSeek配置 - 用于剧本生成
+    # LLM配置 - 用于剧本生成（支持OpenAI兼容接口，如DeepSeek、腾讯混元等）
     deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
-    deepseek_model: str = "deepseek-v3-chat"
+    deepseek_base_url: str = "https://api.hunyuan.cloud.tencent.com/v1"  # 默认使用腾讯混元
+    deepseek_model: str = "hunyuan-turbos-latest"  # 腾讯混元模型
 
     # Gradio Space配置（可选，用于自部署的DeepSeek）
     use_gradio_deepseek: bool = False
@@ -43,6 +43,11 @@ class Settings(BaseSettings):
 
     # IndexTTS2 Gradio配置
     indextts2_gradio_space: str = "IndexTeam/IndexTTS-2-Demo"
+
+    # AliCloud CosyVoice配置
+    alicloud_dashscope_api_key: str = ""
+    cosyvoice_model: str = "cosyvoice-v2"
+    cosyvoice_default_voice: str = "longxiaochun_v2"
 
     # 代理配置（用于访问HuggingFace等国际服务）
     proxy_enabled: bool = False
@@ -63,16 +68,25 @@ class Settings(BaseSettings):
     hunyuan_vision_model: str = "hunyuan-turbos-vision"
 
     # RAG知识库配置
-    rag_enabled: bool = True
+    rag_enabled: bool = True  # 启用RAG知识库深度集成
     rag_chunk_size: int = 1000
     rag_chunk_overlap: int = 200
     rag_max_search_results: int = 5
-    rag_embedding_model: str = "text-embedding-ada-002"
+
+    # 嵌入模型配置（支持腾讯混元）
+    rag_embedding_provider: str = "hunyuan"  # openai 或 hunyuan
+    rag_embedding_model: str = "hunyuan-embedding"
+    rag_embedding_api_key: str = ""
+    rag_embedding_base_url: str = "https://api.hunyuan.cloud.tencent.com/v1"
+    rag_embedding_dimensions: int = 1024
+
     knowledge_base_dir: str = "data/knowledge_base"
     vector_store_dir: str = "data/knowledge_base/chroma_db"
-    rag_auto_ingest: bool = True
-    rag_auto_ingest_patterns: str = "**/*.md,**/*.txt,**/*.pdf,**/*.docx,**/*.json"
-    rag_max_initial_files: int = 100
+
+    # RAG自动导入配置
+    rag_auto_ingest: bool = False  # 是否自动导入知识库文件
+    rag_auto_ingest_patterns: str = "**/*.txt,**/*.md,**/*.pdf"  # 自动导入文件匹配模式（逗号分隔）
+    rag_max_initial_files: int = 100  # 最大自动导入文件数量（0为不限制）
 
     # 文件存储配置
     audio_output_dir: str = "data/output/audio"
@@ -101,6 +115,10 @@ class Settings(BaseSettings):
     worker_connections: int = 1000
     max_requests: int = 1000
     timeout: int = 30
+
+    # 播客生成配置
+    enable_audio_generation: bool = False  # 是否生成音频（设为False只生成剧本）
+    task_worker_count: int = 2  # 任务工作线程数
 
     class Config:
         env_file = ".env"

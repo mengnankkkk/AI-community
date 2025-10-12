@@ -11,7 +11,7 @@ import tempfile
 from typing import List, Dict, Optional
 from pydub import AudioSegment
 
-# 【关键修复】在导入gradio_client之前全局禁用SSL验证
+# 【关键修复】在导入gradio_client之前全局禁用SSL验证并配置WebSocket代理
 # 解决代理环境下的SSL握手问题
 os.environ['GRADIO_SSL_VERIFY'] = 'false'
 os.environ['CURL_CA_BUNDLE'] = ''
@@ -68,6 +68,27 @@ try:
 
 except Exception as e:
     logging.warning(f"无法补丁httpx: {e}")
+
+# 【关键修复3】猴子补丁 websockets 库以支持代理
+# Gradio Client 使用 websockets 库，需要为其配置代理
+try:
+    import websockets
+    from websockets.legacy.client import connect as _original_connect
+
+    # 创建支持代理的 websocket 连接函数
+    def patched_connect(*args, **kwargs):
+        """支持代理的 websocket 连接"""
+        # WebSocket 通过 HTTP CONNECT 隧道使用代理
+        # 但这需要更复杂的实现，暂时禁用SSL验证来解决连接问题
+        kwargs['ssl'] = ssl._create_unverified_context()
+        return _original_connect(*args, **kwargs)
+
+    # 替换默认的 connect 函数
+    websockets.legacy.client.connect = patched_connect
+    websockets.connect = patched_connect
+
+except Exception as e:
+    logging.warning(f"无法补丁websockets: {e}")
 
 # 现在才导入gradio_client
 from gradio_client import Client, handle_file
@@ -164,25 +185,55 @@ class IndexTTS2GradioService:
         if self.initialized:
             return True
 
-        # 配置代理（如果启用）
-        if getattr(settings, 'proxy_enabled', False):
-            http_proxy = getattr(settings, 'http_proxy', '')
-            https_proxy = getattr(settings, 'https_proxy', '')
+        # 【修复】强制设置代理环境变量，确保在多进程/异步环境下生效
+        # 优先使用环境变量，再使用 settings
+        proxy_enabled = os.getenv('PROXY_ENABLED', '').lower() == 'true' or getattr(settings, 'proxy_enabled', False)
+
+        # 准备 httpx 配置（不包含 verify，因为通过 ssl_verify 参数单独传递）
+        httpx_config = {
+            'timeout': 120.0,  # 增加超时到120秒
+        }
+
+        if proxy_enabled:
+            # 从环境变量或settings获取代理地址
+            http_proxy = os.getenv('HTTP_PROXY') or getattr(settings, 'http_proxy', '')
+            https_proxy = os.getenv('HTTPS_PROXY') or getattr(settings, 'https_proxy', '')
 
             if http_proxy:
                 os.environ['HTTP_PROXY'] = http_proxy
-                logger.info(f"设置HTTP代理: {http_proxy}")
+                os.environ['http_proxy'] = http_proxy  # 小写版本，某些库需要
+                logger.info(f"✓ 设置HTTP代理: {http_proxy}")
             if https_proxy:
                 os.environ['HTTPS_PROXY'] = https_proxy
-                logger.info(f"设置HTTPS代理: {https_proxy}")
+                os.environ['https_proxy'] = https_proxy  # 小写版本
+                logger.info(f"✓ 设置HTTPS代理: {https_proxy}")
+
+            # 设置NO_PROXY避免本地回环使用代理
+            if 'NO_PROXY' not in os.environ:
+                os.environ['NO_PROXY'] = 'localhost,127.0.0.1'
+                os.environ['no_proxy'] = 'localhost,127.0.0.1'
+
+            # 为 httpx 配置代理
+            if https_proxy or http_proxy:
+                httpx_config['proxies'] = https_proxy or http_proxy
+                logger.info(f"✓ httpx_kwargs 代理: {httpx_config['proxies']}")
+        else:
+            logger.warning("⚠️ 代理未启用，直接连接可能会超时")
 
         last_error = None
         for attempt in range(max_retries):
             try:
                 logger.info(f"正在连接IndexTTS-2 Gradio服务: {self.space_name} (尝试 {attempt + 1}/{max_retries})")
+                logger.info(f"httpx配置: timeout={httpx_config['timeout']}s, proxy={httpx_config.get('proxies', 'None')}, ssl_verify=False")
 
-                # 创建客户端连接（SSL配置已在模块级别设置）
-                self.client = Client(self.space_name)
+                # 【关键修复】创建客户端时传递 httpx_kwargs 和 ssl_verify
+                # Gradio Client会使用这些参数配置所有HTTP请求
+                self.client = Client(
+                    self.space_name,
+                    httpx_kwargs=httpx_config,
+                    ssl_verify=False,  # 禁用SSL证书验证
+                    verbose=True
+                )
                 self.initialized = True
 
                 logger.info("✅ IndexTTS-2 Gradio客户端初始化成功")
@@ -190,7 +241,16 @@ class IndexTTS2GradioService:
 
             except Exception as e:
                 last_error = e
-                logger.warning(f"❌ 第{attempt + 1}次尝试失败: {str(e)[:200]}")
+                error_msg = str(e)[:300]
+                logger.warning(f"❌ 第{attempt + 1}次尝试失败: {error_msg}")
+
+                # 如果是SSL超时错误，提供额外提示
+                if 'handshake' in error_msg.lower() or 'timeout' in error_msg.lower():
+                    logger.error("💡 检测到连接超时，请确认：")
+                    logger.error(f"  1. 代理服务运行正常（{os.getenv('HTTP_PROXY', 'None')}）")
+                    logger.error("  2. 代理可以访问 https://huggingface.co")
+                    logger.error("  3. 防火墙未阻止连接")
+                    logger.error(f"  4. 超时时间: {httpx_config['timeout']}秒")
 
                 if attempt < max_retries - 1:
                     wait_time = 2 ** attempt  # 指数退避: 1s, 2s, 4s
@@ -198,7 +258,8 @@ class IndexTTS2GradioService:
                     await asyncio.sleep(wait_time)
                     self.initialized = False
 
-        logger.error(f"❌ IndexTTS-2 Gradio客户端初始化最终失败 (共{max_retries}次尝试): {str(last_error)[:200]}")
+        logger.error(f"❌ IndexTTS-2 Gradio客户端初始化最终失败 (共{max_retries}次尝试)")
+        logger.error(f"最后错误: {str(last_error)[:300]}")
         return False
 
     def get_voice_sample_path(self, voice_description: str, voice_file: Optional[str] = None) -> str:
