@@ -13,6 +13,7 @@ from pydub import AudioSegment
 from ..models.podcast import PodcastScript, CharacterRole, ScriptDialogue
 from ..core.config import settings
 from .audio_effects_service import AudioEffectsService
+from .voice_resolver_service import voice_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -240,13 +241,31 @@ class ChatterboxTTSService:
         task_dir = os.path.join(settings.audio_output_dir, task_id)
         os.makedirs(task_dir, exist_ok=True)
 
-        # 为每个角色准备音色样本
+        # 为每个角色准备音色样本（使用统一音色解析服务）
         character_voice_samples = {}
         for char in characters:
+            voice_sample_path = None
+
+            # 优先使用角色自带的voice_file
             if hasattr(char, 'voice_file') and char.voice_file:
                 if os.path.exists(char.voice_file):
-                    character_voice_samples[char.name] = char.voice_file
-                    logger.info(f"角色 {char.name} 使用音色: {char.voice_file}")
+                    voice_sample_path = char.voice_file
+                    logger.info(f"角色 {char.name} 使用指定音色文件: {char.voice_file}")
+
+            # 如果没有voice_file，使用voice_resolver解析voice_description
+            if not voice_sample_path and hasattr(char, 'voice_description') and char.voice_description:
+                _, resolved_voice_file = voice_resolver.resolve_voice(
+                    char.voice_description,
+                    "chatterbox"
+                )
+                if resolved_voice_file and os.path.exists(resolved_voice_file):
+                    voice_sample_path = resolved_voice_file
+                    logger.info(f"角色 {char.name} 使用解析的音色文件: {resolved_voice_file}")
+
+            if voice_sample_path:
+                character_voice_samples[char.name] = voice_sample_path
+            else:
+                logger.warning(f"角色 {char.name} 没有可用的音色样本，将使用默认音色")
 
         # 检测主要语言
         all_text = ' '.join([d.content for d in script.dialogues])

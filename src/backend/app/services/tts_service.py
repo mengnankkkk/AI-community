@@ -7,6 +7,7 @@ from pydub import AudioSegment
 from ..models.podcast import PodcastScript, CharacterRole
 from ..core.config import settings
 from ..utils.text_cleaner import clean_for_tts
+from .voice_resolver_service import voice_resolver
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,40 +23,22 @@ class OpenAITTSService:
         # OpenAI TTS支持的音色列表
         self.available_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
 
-        self.voice_mapping = {
-            "沉稳": "onyx",
-            "浑厚": "onyx",
-            "男中音": "onyx",
-            "清脆": "nova",
-            "有活力": "shimmer",
-            "女声": "nova",
-            "标准": "alloy",
-            "有磁性": "echo",
-            "男声": "fable",
-            "温暖": "alloy"
-        }
-
     def get_voice_for_character(self, voice_description: str) -> str:
-        """根据音色描述选择合适的语音"""
+        """根据音色描述选择合适的语音（使用统一音色解析服务）"""
         if not voice_description:
             return "alloy"  # 默认音色
 
-        voice_description = voice_description.lower()
+        # 使用统一的音色解析服务
+        voice_id, voice_file = voice_resolver.resolve_voice(voice_description, "openai")
 
-        # 优先检查：如果传入的已经是有效的音色ID，直接使用
-        if voice_description in self.available_voices:
-            logger.info(f"直接使用音色ID: {voice_description}")
-            return voice_description
+        # OpenAI TTS只使用音色ID，不支持文件
+        if voice_id in self.available_voices:
+            logger.info(f"使用OpenAI音色: {voice_id}")
+            return voice_id
 
-        # 关键词映射
-        for keyword, voice in self.voice_mapping.items():
-            if keyword in voice_description:
-                logger.info(f"音色映射: {voice_description} -> {voice}")
-                return voice
-
-        # 默认返回标准音色
-        logger.warning(f"未匹配到音色关键词: {voice_description}，使用默认音色")
-        return "alloy"  # 默认音色
+        # 如果解析出的不是有效的OpenAI音色，使用默认
+        logger.warning(f"音色 '{voice_id}' 不是有效的OpenAI音色，使用默认")
+        return "alloy"
 
     async def synthesize_single_audio(self, text: str, voice: str, output_path: str) -> bool:
         """合成单个音频片段"""

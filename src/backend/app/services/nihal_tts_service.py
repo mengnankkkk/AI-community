@@ -14,6 +14,7 @@ from gradio_client import Client
 from ..models.podcast import PodcastScript, CharacterRole
 from ..core.config import settings
 from ..utils.text_cleaner import clean_for_tts
+from .voice_resolver_service import voice_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -128,31 +129,20 @@ class NihalTTSService:
             return False
 
     def get_voice_for_character(self, voice_description: str) -> str:
-        """根据音色描述选择合适的语音"""
+        """根据音色描述选择合适的语音（使用统一音色解析服务）"""
         if not voice_description:
             return "alloy"  # 默认音色
 
-        voice_description_lower = voice_description.lower()
+        # 使用统一的音色解析服务
+        voice_id, voice_file = voice_resolver.resolve_voice(voice_description, "nihal_tts")
 
-        # 优先检查：如果传入的已经是有效的音色ID，直接使用
-        if voice_description_lower in self.available_voices:
-            logger.info(f"直接使用音色ID: {voice_description_lower}")
-            return voice_description_lower
-
-        # 精确匹配关键词
-        for keyword, voice in self.character_voice_mapping.items():
-            if keyword.lower() in voice_description_lower:
-                logger.info(f"音色映射: {voice_description} -> {voice}")
-                return voice
-
-        # 性别识别回退
-        if "女" in voice_description or "female" in voice_description_lower:
-            return "nova"
-        elif "男" in voice_description or "male" in voice_description_lower:
-            return "alloy"
+        # 如果解析的音色ID在可用列表中，直接使用
+        if voice_id.lower() in self.available_voices:
+            logger.info(f"使用Nihal音色: {voice_id.lower()}")
+            return voice_id.lower()
 
         # 默认返回标准音色
-        logger.warning(f"未匹配到音色关键词: {voice_description}，使用默认音色")
+        logger.warning(f"未匹配到Nihal音色: {voice_description}，使用默认音色")
         return "alloy"
 
     def get_emotion_string(self, emotion: Optional[str]) -> str:

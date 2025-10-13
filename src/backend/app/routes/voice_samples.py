@@ -30,34 +30,96 @@ class VoiceSampleInfo(BaseModel):
     is_custom: bool = False  # 是否为用户上传
 
 
+# CosyVoice官方音色列表（阿里云百炼）
+COSYVOICE_VOICES = [
+    {
+        "id": "longwan_v2",
+        "name": "龙湾（男声-标准）",
+        "description": "标准男声，沉稳大气，适合专业播客",
+        "tags": ["男声", "标准", "沉稳", "专业"],
+        "gender": "male",
+        "provider": "cosyvoice"
+    },
+    {
+        "id": "longyuan_v2",
+        "name": "龙渊（男声-浑厚）",
+        "description": "浑厚男声，富有磁性，适合深度访谈",
+        "tags": ["男声", "浑厚", "磁性", "深沉"],
+        "gender": "male",
+        "provider": "cosyvoice"
+    },
+    {
+        "id": "longxiaochun_v2",
+        "name": "龙小春（女声-标准）",
+        "description": "标准女声，清晰自然，适合通用场景",
+        "tags": ["女声", "标准", "清晰", "自然"],
+        "gender": "female",
+        "provider": "cosyvoice"
+    },
+    {
+        "id": "longxiaoxia_v2",
+        "name": "龙小夏（女声-温暖）",
+        "description": "温暖女声，亲和力强，适合情感内容",
+        "tags": ["女声", "温暖", "亲切", "柔和"],
+        "gender": "female",
+        "provider": "cosyvoice"
+    },
+    {
+        "id": "longxiaoyuan_v2",
+        "name": "龙小媛（女声-活力）",
+        "description": "活力女声，朝气蓬勃，适合轻松话题",
+        "tags": ["女声", "活力", "年轻", "热情"],
+        "gender": "female",
+        "provider": "cosyvoice"
+    }
+]
+
+
 @router.get("/presets", summary="获取预设音色样本列表")
 async def list_preset_samples() -> Dict:
     """
     获取所有预设的音色样本
 
-    返回voice_samples目录下的所有.wav文件
+    优先返回CosyVoice官方音色，作为后备返回本地音色样本文件
     """
     try:
+        # 检查是否启用CosyVoice
+        tts_engine = os.getenv("TTS_ENGINE", "").lower()
+        logger.info(f"TTS_ENGINE环境变量: '{tts_engine}', CosyVoice音色数量: {len(COSYVOICE_VOICES)}")
+
+        if tts_engine == "cosyvoice":
+            # 返回CosyVoice官方音色
+            logger.info(f"返回CosyVoice官方音色列表，共{len(COSYVOICE_VOICES)}个音色")
+            return {
+                "success": True,
+                "total": len(COSYVOICE_VOICES),
+                "samples": COSYVOICE_VOICES,
+                "provider": "cosyvoice"
+            }
+
+        # 其他引擎返回本地音色样本文件
         samples = voice_sample_manager.list_available_samples()
 
         # 转换为前端格式
         preset_samples = []
         for sample in samples:
             sample_info = {
-                "id": Path(sample["filename"]).stem,  # 文件名（不含扩展名）
+                "id": Path(sample["filename"]).stem,
                 "name": _get_sample_display_name(sample["filename"]),
                 "file_path": sample["path"],
                 "file_size": sample["size"],
                 "description": _get_sample_description(sample["filename"]),
                 "tags": _get_sample_tags(sample["filename"]),
-                "is_custom": False
+                "is_custom": False,
+                "provider": "local"
             }
             preset_samples.append(sample_info)
 
         return {
             "success": True,
             "total": len(preset_samples),
-            "samples": preset_samples
+            "samples": preset_samples,
+            "provider": "local"
         }
 
     except Exception as e:

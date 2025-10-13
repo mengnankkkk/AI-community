@@ -68,6 +68,7 @@ class PodcastScript(BaseModel):
     topic: str = Field(..., description="播客主题")
     dialogues: List[ScriptDialogue] = Field(..., description="对话列表")
     estimated_duration: Optional[int] = Field(None, description="预估时长(秒)")
+    metadata: Optional[dict] = Field(None, description="元数据（RAG来源等）")
 
 class PodcastGenerationRequest(BaseModel):
     custom_form: PodcastCustomForm = Field(..., description="播客定制单")

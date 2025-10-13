@@ -296,17 +296,8 @@ function addCharacter() {
 
     // 填充音色选择框（使用voice samples）
     const voiceSelect = document.getElementById(`voice-${characterCount}`);
-    if (voiceSelect) {
-        if (voiceSamplesData.loaded) {
-            populateVoiceSampleSelector(voiceSelect, characterCount);
-        } else {
-            // 如果音色样本还没加载，等待加载完成后填充
-            setTimeout(() => {
-                if (voiceSamplesData.loaded) {
-                    populateVoiceSampleSelector(voiceSelect, characterCount);
-                }
-            }, 1000);
-        }
+    if (voiceSelect && typeof populateVoiceSampleSelector === 'function') {
+        populateVoiceSampleSelector(voiceSelect, characterCount);
     }
 }
 

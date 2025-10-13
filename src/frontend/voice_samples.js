@@ -21,27 +21,44 @@ async function initializeVoiceSamples() {
         console.log('[Voice Samples] 开始加载音色样本...');
 
         // 加载预设音色
+        console.log('[Voice Samples] 正在请求预设音色接口...');
         const presetsResponse = await fetch('/api/v1/voice-samples/presets');
+        console.log('[Voice Samples] 预设音色接口响应状态:', presetsResponse.status);
+
         if (presetsResponse.ok) {
             const data = await presetsResponse.json();
             voiceSamplesData.presets = data.samples || [];
             console.log(`[Voice Samples] 已加载 ${voiceSamplesData.presets.length} 个预设音色`);
+            console.log('[Voice Samples] 预设音色列表:', voiceSamplesData.presets);
+        } else {
+            console.error(`[Voice Samples] 预设音色加载失败: HTTP ${presetsResponse.status}`);
         }
 
         // 加载自定义音色
+        console.log('[Voice Samples] 正在请求自定义音色接口...');
         const customResponse = await fetch('/api/v1/voice-samples/custom');
+        console.log('[Voice Samples] 自定义音色接口响应状态:', customResponse.status);
+
         if (customResponse.ok) {
             const data = await customResponse.json();
             voiceSamplesData.custom = data.samples || [];
             console.log(`[Voice Samples] 已加载 ${voiceSamplesData.custom.length} 个自定义音色`);
+            if (voiceSamplesData.custom.length > 0) {
+                console.log('[Voice Samples] 自定义音色列表:', voiceSamplesData.custom);
+            }
+        } else {
+            console.error(`[Voice Samples] 自定义音色加载失败: HTTP ${customResponse.status}`);
         }
 
         voiceSamplesData.loaded = true;
-        console.log('[Voice Samples] 音色样本加载完成');
+        console.log('[Voice Samples] 音色样本加载完成，总计:',
+                    voiceSamplesData.presets.length + voiceSamplesData.custom.length, '个音色');
 
     } catch (error) {
         console.error('[Voice Samples] 加载音色样本失败:', error);
-        showToast('加载音色列表失败', 'error');
+        showToast('加载音色列表失败: ' + error.message, 'error');
+        // 即使失败也标记为已加载，避免无限重试
+        voiceSamplesData.loaded = true;
     }
 }
 
@@ -49,8 +66,19 @@ async function initializeVoiceSamples() {
  * 填充音色选择器
  */
 function populateVoiceSampleSelector(selectElement, characterId) {
-    if (!voiceSamplesData.loaded || !selectElement) {
-        console.warn('[Voice Samples] 数据未加载或选择器不存在');
+    if (!selectElement) {
+        console.warn('[Voice Samples] 选择器不存在');
+        return;
+    }
+
+    if (!voiceSamplesData.loaded) {
+        console.warn('[Voice Samples] 数据未加载，稍后重试');
+        // 如果数据还没加载完，200ms后重试
+        setTimeout(() => {
+            if (voiceSamplesData.loaded) {
+                populateVoiceSampleSelector(selectElement, characterId);
+            }
+        }, 200);
         return;
     }
 
@@ -91,7 +119,7 @@ function populateVoiceSampleSelector(selectElement, characterId) {
         selectElement.appendChild(customGroup);
     }
 
-    console.log(`[Voice Samples] 已填充音色选择器 #voice-${characterId}`);
+    console.log(`[Voice Samples] 已填充音色选择器 #voice-${characterId} (共${voiceSamplesData.presets.length}个预设音色)`);
 }
 
 /**

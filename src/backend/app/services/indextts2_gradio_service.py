@@ -98,6 +98,7 @@ from ..core.config import settings
 from .audio_effects_service import AudioEffectsService
 from .voice_sample_manager import voice_sample_manager
 from ..utils.text_cleaner import clean_for_tts
+from .voice_resolver_service import voice_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -264,10 +265,10 @@ class IndexTTS2GradioService:
 
     def get_voice_sample_path(self, voice_description: str, voice_file: Optional[str] = None) -> str:
         """
-        根据音色描述或文件路径获取音色样本路径
+        根据音色描述或文件路径获取音色样本路径（使用统一音色解析服务）
 
         Args:
-            voice_description: 音色描述关键词
+            voice_description: 音色描述关键词或ID（支持CosyVoice、OpenAI等音色ID）
             voice_file: 音色文件路径（优先使用）
 
         Returns:
@@ -278,29 +279,31 @@ class IndexTTS2GradioService:
             logger.info(f"使用指定的音色文件: {voice_file}")
             return voice_file
 
-        # 回退到关键词匹配
-        if not voice_description:
-            # 使用默认音色
-            default_path = voice_sample_manager.create_default_voice_sample()
-            if default_path and os.path.exists(default_path):
-                return default_path
-            logger.warning("无法获取默认音色样本")
-            return None
+        # 使用统一的音色解析服务
+        voice_id, resolved_voice_file = voice_resolver.resolve_voice(
+            voice_description or "",
+            "indextts2_gradio"
+        )
 
-        voice_description_lower = voice_description.lower()
+        # 如果解析器返回了音色文件路径（自定义音色），直接使用
+        if resolved_voice_file and os.path.exists(resolved_voice_file):
+            logger.info(f"使用解析器返回的音色文件: {resolved_voice_file}")
+            return resolved_voice_file
 
-        # 精确匹配关键词
-        for keyword, sample_file in self.character_voice_mapping.items():
-            if keyword.lower() in voice_description_lower:
+        # 如果解析器返回了音色ID，映射到本地WAV文件
+        if voice_id:
+            # 尝试在本地映射表中查找
+            sample_file = self.character_voice_mapping.get(voice_id)
+            if sample_file:
                 sample_path = os.path.join(self.voice_samples_dir, sample_file)
                 if os.path.exists(sample_path):
-                    logger.info(f"音色映射: {voice_description} -> {sample_path}")
+                    logger.info(f"音色ID映射: {voice_id} -> {sample_path}")
                     return sample_path
 
         # 使用语音样本管理器创建默认样本
         default_path = voice_sample_manager.create_default_voice_sample()
         if default_path and os.path.exists(default_path):
-            logger.warning(f"未匹配到音色关键词: {voice_description}，使用默认音色")
+            logger.warning(f"使用默认音色样本: {default_path}")
             return default_path
 
         logger.warning(f"无法获取音色样本: {voice_description}")

@@ -21,6 +21,7 @@ except ImportError:
 from ..models.podcast import PodcastScript, CharacterRole, ScriptDialogue
 from ..core.config import settings
 from ..utils.text_cleaner import clean_for_tts
+from .voice_resolver_service import voice_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -43,65 +44,6 @@ class AliCloudCosyVoiceService:
         self.model = getattr(settings, 'cosyvoice_model', 'cosyvoice-v2')
         self.default_voice = getattr(settings, 'cosyvoice_default_voice', 'longxiaochun_v2')
 
-        # 角色音色映射（CosyVoice音色）
-        self.character_voice_mapping = {
-            # 中文描述关键词映射
-            "沉稳": "longwan_v2",
-            "浑厚": "longyuan_v2",
-            "男中音": "longwan_v2",
-            "清脆": "longxiaochun_v2",
-            "有活力": "longxiaoyuan_v2",
-            "女声": "longxiaochun_v2",
-            "标准": "longwan_v2",
-            "有磁性": "longyuan_v2",
-            "男声": "longwan_v2",
-            "温暖": "longxiaoxia_v2",
-            "知性": "longxiaochun_v2",
-
-            # 角色名映射
-            "主持人": "longwan_v2",
-            "嘉宾": "longxiaoxia_v2",
-            "博士": "longyuan_v2",
-            "教授": "longwan_v2",
-            "经理": "longxiaochun_v2",
-            "专家": "longyuan_v2",
-
-            # NihalGazi TTS 完整音色映射（13种预设音色）
-            # 男声系列
-            "alloy": "longwan_v2",              # 合金 - 标准中性男声
-            "echo": "longyuan_v2",              # 回声 - 磁性浑厚男声
-            "fable": "longwan_v2",              # 寓言 - 叙述温和男声
-            "onyx": "longyuan_v2",              # 玛瑙 - 沉稳专业男声
-            "ash": "longyuan_v2",               # 灰烬 - 成熟低沉男声
-            "sage": "longwan_v2",               # 智者 - 智慧知性男声
-
-            # 女声系列
-            "nova": "longxiaochun_v2",          # 新星 - 清晰明亮女声
-            "shimmer": "longxiaoyuan_v2",       # 闪光 - 活力年轻女声
-            "coral": "longxiaoxia_v2",          # 珊瑚 - 温暖亲切女声
-            "verse": "longxiaoyuan_v2",         # 诗句 - 优雅抒情女声
-            "ballad": "longxiaoxia_v2",         # 民谣 - 柔美歌唱女声
-
-            # 特色系列
-            "amuch": "longwan_v2",              # 阿穆奇 - 独特特色
-            "dan": "longyuan_v2",               # 丹 - 多变个性
-
-            # voice_XX 数字ID映射（与上述音色对应）
-            "voice_01": "longwan_v2",           # alloy - 标准男声
-            "voice_02": "longyuan_v2",          # echo - 磁性男声
-            "voice_03": "longwan_v2",           # fable - 温和男声
-            "voice_04": "longyuan_v2",          # onyx - 浑厚男声
-            "voice_05": "longyuan_v2",          # ash - 沉稳男声
-            "voice_06": "longwan_v2",           # sage - 智者男声
-            "voice_07": "longxiaochun_v2",      # nova - 清晰女声
-            "voice_08": "longxiaoyuan_v2",      # shimmer - 活力女声
-            "voice_09": "longxiaoxia_v2",       # coral - 温暖女声
-            "voice_10": "longxiaoyuan_v2",      # verse - 优雅女声
-            "voice_11": "longxiaoxia_v2",       # ballad - 柔美女声
-            "voice_12": "longwan_v2",           # amuch - 特色
-            "voice_13": "longyuan_v2",          # dan - 特色
-        }
-
         # 常用CosyVoice音色列表
         self.available_voices = [
             "longwan_v2",           # 男声-标准
@@ -112,25 +54,20 @@ class AliCloudCosyVoiceService:
         ]
 
     def get_voice_for_character(self, voice_description: str) -> str:
-        """根据音色描述选择合适的CosyVoice音色"""
+        """根据音色描述选择合适的CosyVoice音色（使用统一音色解析服务）"""
         if not voice_description:
             return self.default_voice
 
-        voice_description_lower = voice_description.lower()
+        # 使用统一的音色解析服务
+        voice_id, voice_file = voice_resolver.resolve_voice(voice_description, "cosyvoice")
 
-        # 检查是否已经是有效的音色ID
-        if voice_description in self.available_voices:
-            logger.info(f"直接使用音色ID: {voice_description}")
-            return voice_description
+        # CosyVoice只使用音色ID
+        if voice_id in self.available_voices:
+            logger.info(f"使用CosyVoice音色: {voice_id}")
+            return voice_id
 
-        # 关键词映射
-        for keyword, voice in self.character_voice_mapping.items():
-            if keyword.lower() in voice_description_lower:
-                logger.info(f"音色映射: {voice_description} -> {voice}")
-                return voice
-
-        # 默认返回标准音色
-        logger.warning(f"未匹配到音色关键词: {voice_description}，使用默认音色")
+        # 如果解析的音色ID不在可用列表中，使用默认
+        logger.warning(f"音色 '{voice_id}' 不是有效的CosyVoice音色，使用默认: {self.default_voice}")
         return self.default_voice
 
     async def synthesize_single_audio(self, text: str, voice: str, output_path: str) -> bool:

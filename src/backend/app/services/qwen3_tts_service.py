@@ -15,6 +15,7 @@ from gradio_client import Client
 from ..models.podcast import PodcastScript, CharacterRole
 from ..core.config import settings
 from ..utils.text_cleaner import clean_for_tts
+from .voice_resolver_service import voice_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -96,35 +97,33 @@ class Qwen3TTSService:
             return False
 
     def get_voice_for_character(self, voice_description: str) -> str:
-        """根据音色描述选择合适的语音"""
+        """根据音色描述选择合适的语音（使用统一音色解析服务）"""
         if not voice_description:
             return "Cherry / 芊悦"  # 默认音色
 
-        voice_description_lower = voice_description.lower()
+        # 使用统一的音色解析服务
+        voice_id, voice_file = voice_resolver.resolve_voice(voice_description, "qwen3_tts")
 
-        # 优先检查：如果传入的已经是有效的音色ID，直接使用
-        # 支持完整匹配或部分匹配（如 "cherry" 匹配 "Cherry / 芊悦"）
+        # 如果解析的音色ID在可用列表中，直接使用
+        if voice_id in self.available_voices:
+            logger.info(f"使用Qwen3音色: {voice_id}")
+            return voice_id
+
+        # 如果不在列表中，检查是否是关键词映射到Qwen3音色
+        if voice_id in self.character_voice_mapping.values():
+            logger.info(f"使用映射的Qwen3音色: {voice_id}")
+            return voice_id
+
+        # 检查部分匹配（如 "cherry" 匹配 "Cherry / 芊悦"）
+        voice_description_lower = voice_description.lower()
         for available_voice in self.available_voices:
-            if (voice_description == available_voice or
-                voice_description_lower == available_voice.lower() or
+            if (voice_description_lower == available_voice.lower() or
                 voice_description_lower in available_voice.lower().split('/')[0].strip().lower()):
-                logger.info(f"直接使用音色ID: {available_voice}")
+                logger.info(f"部分匹配到音色: {available_voice}")
                 return available_voice
 
-        # 精确匹配关键词
-        for keyword, voice in self.character_voice_mapping.items():
-            if keyword.lower() in voice_description_lower:
-                logger.info(f"音色映射: {voice_description} -> {voice}")
-                return voice
-
-        # 性别识别回退
-        if "女" in voice_description or "female" in voice_description_lower:
-            return "Cherry / 芊悦"
-        elif "男" in voice_description or "male" in voice_description_lower:
-            return "Ethan / 晨煦"
-
         # 默认返回标准音色
-        logger.warning(f"未匹配到音色关键词: {voice_description}，使用默认音色")
+        logger.warning(f"未匹配到Qwen3音色: {voice_description}，使用默认音色")
         return "Cherry / 芊悦"
 
     async def synthesize_single_audio(self, text: str, voice: str, output_path: str = None) -> str:
