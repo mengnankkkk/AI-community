@@ -7,7 +7,8 @@ import asyncio
 import os
 import logging
 import tempfile
-from typing import List, Dict, Optional
+import io
+from typing import List, Dict, Optional, Tuple
 from pydub import AudioSegment
 
 try:
@@ -40,6 +41,9 @@ class AliCloudCosyVoiceService:
         else:
             logger.warning("阿里云API Key未配置，CosyVoice服务不可用")
 
+        # 配置FFmpeg路径（pydub需要）
+        self._configure_ffmpeg()
+
         # 模型配置
         self.model = getattr(settings, 'cosyvoice_model', 'cosyvoice-v2')
         self.default_voice = getattr(settings, 'cosyvoice_default_voice', 'longxiaochun_v2')
@@ -52,6 +56,37 @@ class AliCloudCosyVoiceService:
             "longxiaoxia_v2",       # 女声-温暖
             "longxiaoyuan_v2",      # 女声-活力
         ]
+
+    def _configure_ffmpeg(self):
+        """配置FFmpeg路径供pydub使用"""
+        ffmpeg_path = getattr(settings, 'ffmpeg_path', '')
+        ffprobe_path = getattr(settings, 'ffprobe_path', '')
+
+        # 如果配置了路径,设置给pydub
+        if ffmpeg_path and os.path.exists(ffmpeg_path):
+            # 如果是目录,添加可执行文件名
+            if os.path.isdir(ffmpeg_path):
+                ffmpeg_exe = os.path.join(ffmpeg_path, 'ffmpeg.exe')
+                ffprobe_exe = os.path.join(ffmpeg_path, 'ffprobe.exe')
+            else:
+                ffmpeg_exe = ffmpeg_path
+                ffprobe_exe = ffprobe_path if ffprobe_path else ffmpeg_path.replace('ffmpeg', 'ffprobe')
+
+            # 检查文件是否存在
+            if os.path.isfile(ffmpeg_exe):
+                AudioSegment.converter = ffmpeg_exe
+                logger.info(f"✅ FFmpeg配置: {ffmpeg_exe}")
+            else:
+                logger.warning(f"⚠️ FFmpeg文件不存在: {ffmpeg_exe}")
+
+            if os.path.isfile(ffprobe_exe):
+                AudioSegment.ffprobe = ffprobe_exe
+                logger.info(f"✅ FFprobe配置: {ffprobe_exe}")
+            else:
+                logger.warning(f"⚠️ FFprobe文件不存在: {ffprobe_exe}")
+        else:
+            logger.warning("⚠️ FFmpeg路径未配置或不存在,将使用系统PATH中的FFmpeg")
+            logger.info("提示: 在.env中配置 FFMPEG_PATH 和 FFPROBE_PATH 以使用自定义FFmpeg")
 
     def get_voice_for_character(self, voice_description: str) -> str:
         """根据音色描述选择合适的CosyVoice音色（使用统一音色解析服务）"""
@@ -70,8 +105,8 @@ class AliCloudCosyVoiceService:
         logger.warning(f"音色 '{voice_id}' 不是有效的CosyVoice音色，使用默认: {self.default_voice}")
         return self.default_voice
 
-    async def synthesize_single_audio(self, text: str, voice: str, output_path: str) -> bool:
-        """合成单个音频片段"""
+    async def synthesize_single_audio(self, text: str, voice: str) -> Tuple[bool, Optional[bytes]]:
+        """合成单个音频片段，返回音频数据"""
         try:
             # 清理文本
             cleaned_text = clean_for_tts(text, emotion=None)
@@ -92,19 +127,15 @@ class AliCloudCosyVoiceService:
             logger.info(f'[Metric] requestId: {synthesizer.get_last_request_id()}, '
                        f'首包延迟: {synthesizer.get_first_package_delay()}ms')
 
-            # 保存音频（直接保存为二进制数据，不需要ffmpeg）
-            with open(output_path, 'wb') as f:
-                f.write(audio_data)
-
-            logger.info(f"✅ CosyVoice音频合成成功: {output_path}")
-            return True
+            logger.info(f"✅ CosyVoice音频合成成功，数据大小: {len(audio_data)} bytes")
+            return True, audio_data
 
         except Exception as e:
             logger.error(f"❌ CosyVoice音频合成失败: {str(e)}")
             logger.error(f"错误详情: {repr(e)}")
             import traceback
             logger.error(traceback.format_exc())
-            return False
+            return False, None
 
     async def synthesize_script_audio(self, script: PodcastScript, characters: List[CharacterRole],
                                      task_id: str, atmosphere: str = "轻松幽默",
@@ -127,27 +158,19 @@ class AliCloudCosyVoiceService:
 
         for i, dialogue in enumerate(script.dialogues):
             voice = character_voices.get(dialogue.character_name, self.default_voice)
-            # CosyVoice 返回 WAV 格式，先保存为 WAV
-            output_path = os.path.join(task_dir, f"segment_{i:03d}.wav")
 
             try:
-                success = await self.synthesize_single_audio(
+                # 合成音频，直接获取音频数据
+                success, audio_data = await self.synthesize_single_audio(
                     text=dialogue.content,
-                    voice=voice,
-                    output_path=output_path
+                    voice=voice
                 )
 
-                if success and os.path.exists(output_path):
-                    # 加载音频片段（WAV格式不需要ffmpeg）
-                    segment = AudioSegment.from_wav(output_path)
+                if success and audio_data:
+                    # 从二进制数据直接加载音频（不需要ffprobe）
+                    segment = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
                     audio_segments.append(segment)
                     logger.info(f"成功合成片段 {i+1}/{len(script.dialogues)}")
-
-                    # 清理临时文件
-                    try:
-                        os.remove(output_path)
-                    except:
-                        pass
                 else:
                     logger.error(f"片段 {i} 合成失败")
 
@@ -174,7 +197,17 @@ class AliCloudCosyVoiceService:
 
         # 保存最终音频
         final_path = os.path.join(task_dir, f"podcast_{task_id}.mp3")
-        combined.export(final_path, format="mp3", bitrate="192k")
+
+        try:
+            # 尝试导出为MP3（需要FFmpeg）
+            combined.export(final_path, format="mp3", bitrate="192k")
+            logger.info(f"✅ 音频导出为MP3格式")
+        except Exception as e:
+            # 如果FFmpeg不可用，回退到WAV格式
+            logger.warning(f"MP3导出失败（可能缺少FFmpeg）: {e}")
+            logger.info("回退到WAV格式")
+            final_path = os.path.join(task_dir, f"podcast_{task_id}.wav")
+            combined.export(final_path, format="wav")
 
         total_duration = len(combined) // 1000
         logger.info(f"✅ CosyVoice播客音频生成完成: {final_path} (时长: {total_duration}秒)")

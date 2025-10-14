@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     cosyvoice_model: str = "cosyvoice-v2"
     cosyvoice_default_voice: str = "longxiaochun_v2"
 
+    # FFmpeg配置（音频处理）
+    ffmpeg_path: str = ""
+    ffprobe_path: str = ""
+
     # 代理配置（用于访问HuggingFace等国际服务）
     proxy_enabled: bool = False
     proxy_type: str = "http"
