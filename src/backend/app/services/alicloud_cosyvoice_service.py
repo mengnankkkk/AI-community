@@ -107,35 +107,60 @@ class AliCloudCosyVoiceService:
 
     async def synthesize_single_audio(self, text: str, voice: str) -> Tuple[bool, Optional[bytes]]:
         """合成单个音频片段，返回音频数据"""
-        try:
-            # 清理文本
-            cleaned_text = clean_for_tts(text, emotion=None)
+        # 清理文本
+        cleaned_text = clean_for_tts(text, emotion=None)
 
-            if cleaned_text != text:
-                logger.info(f"文本清理: [{text[:50]}...] -> [{cleaned_text[:50]}...]")
+        if cleaned_text != text:
+            logger.info(f"文本清理: [{text[:50]}...] -> [{cleaned_text[:50]}...]")
 
-            # 使用SpeechSynthesizer合成语音
-            synthesizer = SpeechSynthesizer(
-                model=self.model,
-                voice=voice
-            )
+        max_retries = 3
+        last_error: Optional[Exception] = None
 
-            # 调用合成
-            audio_data = synthesizer.call(cleaned_text)
+        for attempt in range(1, max_retries + 1):
+            try:
+                synthesizer = SpeechSynthesizer(
+                    model=self.model,
+                    voice=voice
+                )
 
-            # 记录首包延迟（用于性能监控）
-            logger.info(f'[Metric] requestId: {synthesizer.get_last_request_id()}, '
-                       f'首包延迟: {synthesizer.get_first_package_delay()}ms')
+                # call为同步阻塞，放入线程池避免阻塞事件循环
+                audio_data = await asyncio.to_thread(synthesizer.call, cleaned_text)
 
-            logger.info(f"✅ CosyVoice音频合成成功，数据大小: {len(audio_data)} bytes")
-            return True, audio_data
+                logger.info(
+                    f'[Metric] requestId: {synthesizer.get_last_request_id()}, '
+                    f'首包延迟: {synthesizer.get_first_package_delay()}ms'
+                )
+                logger.info(f"✅ CosyVoice音频合成成功，数据大小: {len(audio_data)} bytes")
+                return True, audio_data
 
-        except Exception as e:
-            logger.error(f"❌ CosyVoice音频合成失败: {str(e)}")
-            logger.error(f"错误详情: {repr(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return False, None
+            except Exception as error:  # noqa: BLE001 - 需捕捉SDK内部异常
+                last_error = error
+                message = str(error)
+
+                connection_issue = any(
+                    keyword in message.lower()
+                    for keyword in [
+                        "websocket closed",
+                        "connection to remote host was lost",
+                        "connection reset",
+                        "timeout"
+                    ]
+                )
+
+                if attempt < max_retries and connection_issue:
+                    logger.warning(
+                        f"⚠️ CosyVoice连接异常，准备重试 {attempt}/{max_retries}: {message}"
+                    )
+                    await asyncio.sleep(1 * attempt)
+                    continue
+
+                logger.error(f"❌ CosyVoice音频合成失败: {message}")
+                logger.error(f"错误详情: {repr(error)}")
+                import traceback
+                logger.error(traceback.format_exc())
+                break
+
+        return False, None
 
     async def synthesize_script_audio(self, script: PodcastScript, characters: List[CharacterRole],
                                      task_id: str, atmosphere: str = "轻松幽默",
@@ -167,8 +192,7 @@ class AliCloudCosyVoiceService:
                 )
 
                 if success and audio_data:
-                    # 从二进制数据直接加载音频（不需要ffprobe）
-                    segment = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+                    segment = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
                     audio_segments.append(segment)
                     logger.info(f"成功合成片段 {i+1}/{len(script.dialogues)}")
                 else:

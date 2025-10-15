@@ -245,6 +245,44 @@ class ScriptGenerator:
 
         cache_dict[key] = value
 
+    async def _invoke_chat_completion(self, messages, temperature: float = 0.7,
+                                      model: Optional[str] = None, **kwargs):
+        """统一的聊天补全调用，自动处理连接异常并回退模板客户端"""
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+
+        if model is None:
+            model = settings.deepseek_model
+
+        try:
+            return await self.deepseek_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                **kwargs
+            )
+        except openai.APIConnectionError as conn_err:
+            print(f"[LLM] 连接失败，启用回退模式: {conn_err}")
+            self.deepseek_client = self._create_fallback_client()
+            return await self.deepseek_client.chat.completions.create(
+                model="fallback",
+                messages=messages,
+                temperature=temperature,
+                **kwargs
+            )
+        except Exception as err:
+            if isinstance(self.deepseek_client, FallbackClient):
+                raise
+
+            print(f"[LLM] 请求异常，切换回退模式: {err}")
+            self.deepseek_client = self._create_fallback_client()
+            return await self.deepseek_client.chat.completions.create(
+                model="fallback",
+                messages=messages,
+                temperature=temperature,
+                **kwargs
+            )
+
     def generate_analysis_prompt(self, materials: str) -> str:
         """生成素材分析提示词 - 针对 Gemini 2.5 Flash 优化"""
         return f"""# 任务：深度分析文本素材，为播客创作提供结构化见解
@@ -817,8 +855,7 @@ class ScriptGenerator:
 
         try:
             # 调用LLM生成结构规划
-            response = await self.deepseek_client.chat.completions.create(
-                model=settings.deepseek_model,
+            response = await self._invoke_chat_completion(
                 messages=[{"role": "user", "content": structure_prompt}],
                 temperature=0.5  # 较低温度确保结构合理
             )
@@ -1020,8 +1057,7 @@ class ScriptGenerator:
 
         try:
             # 调用LLM生成本阶段内容
-            response = await self.deepseek_client.chat.completions.create(
-                model=settings.deepseek_model,
+            response = await self._invoke_chat_completion(
                 messages=[{"role": "user", "content": stage_prompt}],
                 temperature=0.7
             )
@@ -1567,8 +1603,7 @@ class ScriptGenerator:
             print(f"[DEBUG] 初始Prompt生成完成，长度: {len(initial_prompt)}")
 
             print(f"[DEBUG] 调用客户端生成初始对话...")
-            response = await self.deepseek_client.chat.completions.create(
-                model=settings.deepseek_model,
+            response = await self._invoke_chat_completion(
                 messages=[{"role": "user", "content": initial_prompt}],
                 temperature=0.7  # 降低temperature，减少随机性和重复
             )
@@ -1656,8 +1691,7 @@ class ScriptGenerator:
                 continue_prompt = self.generate_continue_prompt(form, next_speaker, rag_context)
 
                 # 调用LLM生成下一轮对话
-                response = await self.deepseek_client.chat.completions.create(
-                    model=settings.deepseek_model,
+                response = await self._invoke_chat_completion(
                     messages=[{"role": "user", "content": continue_prompt}],
                     temperature=0.7  # 降低temperature，减少随机性
                 )
@@ -1832,8 +1866,7 @@ class ScriptGenerator:
 现在生成结束语："""
 
         try:
-            response = await self.deepseek_client.chat.completions.create(
-                model=settings.deepseek_model,
+            response = await self._invoke_chat_completion(
                 messages=[{"role": "user", "content": ending_prompt}],
                 temperature=0.6  # 结束语更稳定
             )
@@ -1924,8 +1957,7 @@ class ScriptGenerator:
 现在生成："""
 
         try:
-            response = await self.deepseek_client.chat.completions.create(
-                model=settings.deepseek_model,
+            response = await self._invoke_chat_completion(
                 messages=[{"role": "user", "content": farewell_prompt}],
                 temperature=0.6
             )
