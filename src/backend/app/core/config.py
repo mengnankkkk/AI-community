@@ -46,8 +46,10 @@ class Settings(BaseSettings):
 
     # AliCloud CosyVoice配置
     alicloud_dashscope_api_key: str = ""
+    alicloud_dashscope_api_secret: str = ""  # 用于音色克隆功能
     cosyvoice_model: str = "cosyvoice-v2"
     cosyvoice_default_voice: str = "longxiaochun_v2"
+    cosyvoice_enable_clone: bool = True  # 是否启用音色克隆功能
 
     # FFmpeg配置（音频处理）
     ffmpeg_path: str = ""

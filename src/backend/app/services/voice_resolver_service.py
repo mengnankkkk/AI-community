@@ -129,7 +129,7 @@ class VoiceResolverService:
             "活力": {
                 "cosyvoice": "longxiaoyuan_v2",
                 "openai": "nova",
-                "qwen3_tts": "Ryan / 甜茶",
+                "qwen3_tts": "Cherry / 芊悦",  # 女声甜美（与cosyvoice保持性别一致）
                 "nihal_tts": "shimmer",
                 "default": "female_energetic"
             },
@@ -157,7 +157,7 @@ class VoiceResolverService:
 
             # 通用特征
             "标准": {
-                "cosyvoice": "longxiaochun_v2",
+                "cosyvoice": "longwan_v2",  # 男声标准（与qwen3保持性别一致）
                 "openai": "alloy",
                 "qwen3_tts": "Ethan / 晨煦",
                 "nihal_tts": "alloy",

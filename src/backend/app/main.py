@@ -29,7 +29,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .core.config import settings, create_directories
-from .routes import podcast, knowledge, quality, vision, voice, voice_samples
+from .routes import podcast, knowledge, quality, vision, voice, voice_samples, voice_clone
 
 # 创建必要的目录
 create_directories()
@@ -57,6 +57,7 @@ app.include_router(quality.router, prefix=settings.api_prefix)
 app.include_router(vision.router, prefix=settings.api_prefix)
 app.include_router(voice.router, prefix=settings.api_prefix)
 app.include_router(voice_samples.router, prefix=settings.api_prefix)
+app.include_router(voice_clone.router, prefix=settings.api_prefix)  # 音色克隆API
 
 # 挂载静态文件服务 - 需要获取正确的项目根目录路径
 import os

@@ -135,6 +135,13 @@ function updateVoiceSampleDescription(characterId) {
 
     if (selectedOption && selectedOption.value) {
         try {
+            // 检查 dataset.sampleData 是否存在
+            if (!selectedOption.dataset.sampleData) {
+                console.warn('[Voice Samples] 音色数据未初始化:', selectedOption.value);
+                descElement.innerHTML = '<i class="fas fa-info-circle me-1"></i>音色数据加载中...';
+                return;
+            }
+
             const sampleData = JSON.parse(selectedOption.dataset.sampleData);
             const isCustom = selectedOption.dataset.isCustom === 'true';
 
@@ -166,7 +173,23 @@ async function previewVoiceSample(characterId) {
     }
 
     const sampleId = selectElement.value;
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
     const playButton = selectElement.parentElement.querySelector('button[onclick*="previewVoiceSample"]');
+
+    // 检查是否是云端音色（CosyVoice）
+    try {
+        if (selectedOption.dataset.sampleData) {
+            const sampleData = JSON.parse(selectedOption.dataset.sampleData);
+
+            // 云端音色没有本地预览文件
+            if (sampleData.provider === 'cosyvoice' || !sampleData.file_path) {
+                showToast('CosyVoice 云端音色暂不支持预览，可直接用于播客生成', 'info');
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn('[Voice Samples] 检查音色类型失败:', e);
+    }
 
     try {
         // 停止之前的播放
@@ -212,7 +235,7 @@ async function previewVoiceSample(characterId) {
 
         currentAudio.onerror = (e) => {
             console.error('[Voice Samples] 音频加载失败:', e);
-            showToast('音色预览失败', 'error');
+            showToast('音色预览失败：文件不存在或格式不支持', 'error');
             if (playButton) {
                 playButton.innerHTML = '<i class="fas fa-play-circle"></i>';
                 playButton.title = '试听音色';
@@ -236,6 +259,7 @@ async function previewVoiceSample(characterId) {
 async function uploadCustomVoice(characterId) {
     const fileInput = document.getElementById(`custom-voice-${characterId}`);
     const voiceSelect = document.getElementById(`voice-${characterId}`);
+    const cloneCheckbox = document.getElementById(`enable-clone-${characterId}`);
 
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
         return;
@@ -252,21 +276,28 @@ async function uploadCustomVoice(characterId) {
     }
 
     // 验证文件类型
-    const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3'];
+    const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/x-m4a'];
     if (!allowedTypes.includes(file.type)) {
-        showToast('仅支持WAV和MP3格式', 'error');
+        showToast('仅支持WAV、MP3和M4A格式', 'error');
         fileInput.value = '';
         return;
     }
 
     try {
-        showToast('正在上传音色...', 'info');
+        const enableClone = cloneCheckbox ? cloneCheckbox.checked : false;
+
+        if (enableClone) {
+            showToast('正在上传音色并克隆...', 'info');
+        } else {
+            showToast('正在上传音色...', 'info');
+        }
 
         // 创建FormData
         const formData = new FormData();
         formData.append('file', file);
         formData.append('name', `角色${characterId}自定义音色`);
         formData.append('description', `角色${characterId}的自定义音色`);
+        formData.append('enable_clone', enableClone);
 
         // 上传文件
         const response = await fetch('/api/v1/voice-samples/upload', {
@@ -282,6 +313,19 @@ async function uploadCustomVoice(characterId) {
         const data = await response.json();
         console.log('[Voice Samples] 上传成功:', data);
 
+        // 检查克隆状态
+        if (enableClone && data.clone_status) {
+            if (data.clone_status === 'success') {
+                showToast(`✅ 音色上传并克隆成功！音色ID: ${data.clone_info.voice_id}`, 'success');
+            } else if (data.clone_status === 'failed') {
+                showToast(`⚠️ 音色已上传，但克隆失败: ${data.clone_error || data.clone_warning}`, 'warning');
+            } else {
+                showToast('⚠️ 音色已上传，克隆过程出现异常', 'warning');
+            }
+        } else {
+            showToast('✅ 音色上传成功！', 'success');
+        }
+
         // 重新加载自定义音色列表
         await loadCustomVoices();
 
@@ -294,14 +338,15 @@ async function uploadCustomVoice(characterId) {
             updateVoiceSampleDescription(characterId);
         }
 
-        showToast('音色上传成功！', 'success');
-
     } catch (error) {
         console.error('[Voice Samples] 上传失败:', error);
         showToast(`上传失败: ${error.message}`, 'error');
     } finally {
         // 清空文件输入
         fileInput.value = '';
+        if (cloneCheckbox) {
+            cloneCheckbox.checked = false;
+        }
     }
 }
 

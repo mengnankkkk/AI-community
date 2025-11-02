@@ -35,42 +35,57 @@ COSYVOICE_VOICES = [
     {
         "id": "longwan_v2",
         "name": "龙湾（男声-标准）",
+        "file_path": "",  # 云端音色，无本地文件
+        "file_size": 0,
         "description": "标准男声，沉稳大气，适合专业播客",
         "tags": ["男声", "标准", "沉稳", "专业"],
         "gender": "male",
-        "provider": "cosyvoice"
+        "provider": "cosyvoice",
+        "is_custom": False
     },
     {
         "id": "longyuan_v2",
         "name": "龙渊（男声-浑厚）",
+        "file_path": "",  # 云端音色，无本地文件
+        "file_size": 0,
         "description": "浑厚男声，富有磁性，适合深度访谈",
         "tags": ["男声", "浑厚", "磁性", "深沉"],
         "gender": "male",
-        "provider": "cosyvoice"
+        "provider": "cosyvoice",
+        "is_custom": False
     },
     {
         "id": "longxiaochun_v2",
         "name": "龙小春（女声-标准）",
+        "file_path": "",  # 云端音色，无本地文件
+        "file_size": 0,
         "description": "标准女声，清晰自然，适合通用场景",
         "tags": ["女声", "标准", "清晰", "自然"],
         "gender": "female",
-        "provider": "cosyvoice"
+        "provider": "cosyvoice",
+        "is_custom": False
     },
     {
         "id": "longxiaoxia_v2",
         "name": "龙小夏（女声-温暖）",
+        "file_path": "",  # 云端音色，无本地文件
+        "file_size": 0,
         "description": "温暖女声，亲和力强，适合情感内容",
         "tags": ["女声", "温暖", "亲切", "柔和"],
         "gender": "female",
-        "provider": "cosyvoice"
+        "provider": "cosyvoice",
+        "is_custom": False
     },
     {
         "id": "longxiaoyuan_v2",
         "name": "龙小媛（女声-活力）",
+        "file_path": "",  # 云端音色，无本地文件
+        "file_size": 0,
         "description": "活力女声，朝气蓬勃，适合轻松话题",
         "tags": ["女声", "活力", "年轻", "热情"],
         "gender": "female",
-        "provider": "cosyvoice"
+        "provider": "cosyvoice",
+        "is_custom": False
     }
 ]
 
@@ -131,7 +146,8 @@ async def list_preset_samples() -> Dict:
 async def upload_custom_sample(
     file: UploadFile = File(..., description="音频文件（WAV格式，建议3-10秒）"),
     name: Optional[str] = Form(None, description="音色名称"),
-    description: Optional[str] = Form(None, description="音色描述")
+    description: Optional[str] = Form(None, description="音色描述"),
+    enable_clone: bool = Form(False, description="是否启用CosyVoice音色克隆")
 ) -> Dict:
     """
     上传自定义音色样本文件
@@ -189,7 +205,8 @@ async def upload_custom_sample(
                 file_path = wav_path
                 safe_filename = Path(wav_path).name
 
-        return {
+        # 构建基本响应
+        response = {
             "success": True,
             "sample": {
                 "id": Path(safe_filename).stem,
@@ -201,6 +218,53 @@ async def upload_custom_sample(
                 "created_at": datetime.now().isoformat()
             }
         }
+
+        # 如果启用克隆，调用CosyVoice克隆服务
+        if enable_clone and settings.tts_engine == "cosyvoice":
+            try:
+                from ..services.cosyvoice_clone_service import cosyvoice_clone_service
+
+                # 生成音色前缀（只包含字母数字）
+                voice_prefix = f"custom{unique_id}"
+
+                logger.info(f"开始CosyVoice音色克隆: voice_prefix={voice_prefix}")
+
+                # 验证音频文件
+                is_valid, error_msg = await cosyvoice_clone_service.validate_audio_for_cloning(file_path)
+                if not is_valid:
+                    response["clone_warning"] = f"音频验证失败: {error_msg}"
+                    response["clone_status"] = "failed"
+                else:
+                    # TODO: 需要将文件上传到公网可访问的位置（如OSS）
+                    # 这里暂时使用本地路径
+                    audio_url = f"file://{file_path}"
+
+                    # 调用克隆服务
+                    clone_result = await cosyvoice_clone_service.clone_voice(
+                        audio_url=audio_url,
+                        voice_prefix=voice_prefix,
+                        voice_name=name or f"自定义音色_{unique_id}"
+                    )
+
+                    if clone_result.get("success"):
+                        response["clone_status"] = "success"
+                        response["clone_info"] = {
+                            "voice_id": clone_result.get("voice_id"),
+                            "voice_prefix": clone_result.get("voice_prefix"),
+                            "message": clone_result.get("message")
+                        }
+                        logger.info(f"✅ CosyVoice音色克隆成功: {clone_result}")
+                    else:
+                        response["clone_status"] = "failed"
+                        response["clone_error"] = clone_result.get("error")
+                        logger.warning(f"⚠️ CosyVoice音色克隆失败: {clone_result.get('error')}")
+
+            except Exception as e:
+                logger.error(f"音色克隆异常: {str(e)}", exc_info=True)
+                response["clone_status"] = "error"
+                response["clone_error"] = str(e)
+
+        return response
 
     except HTTPException:
         raise
