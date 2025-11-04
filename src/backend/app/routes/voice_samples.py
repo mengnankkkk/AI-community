@@ -30,10 +30,10 @@ class VoiceSampleInfo(BaseModel):
     is_custom: bool = False  # 是否为用户上传
 
 
-# CosyVoice官方音色列表（阿里云百炼）
+# CosyVoice官方音色列表（阿里云百炼）- v1格式（不带_v2后缀）
 COSYVOICE_VOICES = [
     {
-        "id": "longwan_v2",
+        "id": "longwan",
         "name": "龙湾（男声-标准）",
         "file_path": "",  # 云端音色，无本地文件
         "file_size": 0,
@@ -44,7 +44,7 @@ COSYVOICE_VOICES = [
         "is_custom": False
     },
     {
-        "id": "longyuan_v2",
+        "id": "longyuan",
         "name": "龙渊（男声-浑厚）",
         "file_path": "",  # 云端音色，无本地文件
         "file_size": 0,
@@ -55,7 +55,7 @@ COSYVOICE_VOICES = [
         "is_custom": False
     },
     {
-        "id": "longxiaochun_v2",
+        "id": "longxiaochun",
         "name": "龙小春（女声-标准）",
         "file_path": "",  # 云端音色，无本地文件
         "file_size": 0,
@@ -66,7 +66,7 @@ COSYVOICE_VOICES = [
         "is_custom": False
     },
     {
-        "id": "longxiaoxia_v2",
+        "id": "longxiaoxia",
         "name": "龙小夏（女声-温暖）",
         "file_path": "",  # 云端音色，无本地文件
         "file_size": 0,
@@ -77,7 +77,7 @@ COSYVOICE_VOICES = [
         "is_custom": False
     },
     {
-        "id": "longxiaoyuan_v2",
+        "id": "longxiaoyuan",
         "name": "龙小媛（女声-活力）",
         "file_path": "",  # 云端音色，无本地文件
         "file_size": 0,

@@ -372,12 +372,15 @@ function collectFormData() {
             // 获取选中的音色数据
             const selectedOption = voiceSelect.options[voiceSelect.selectedIndex];
             let voiceFile = null;
-            let voiceDescription = voiceSelect.value;
+            let voiceDescription = voiceSelect.value;  // 使用音色ID（如 "longwan"）
 
             try {
                 const sampleData = JSON.parse(selectedOption.dataset.sampleData || '{}');
                 voiceFile = sampleData.file_path || null;
-                voiceDescription = sampleData.name || voiceSelect.value;
+                // ⚠️ 重要：voice_description 必须使用音色ID，而不是音色名称
+                // voiceSelect.value 就是音色ID（如 "longwan", "longxiaochun"）
+                // sampleData.name 是音色名称（如 "龙湾（男声-标准）"），不能用于API调用
+                voiceDescription = voiceSelect.value;  // ✅ 始终使用音色ID
             } catch (e) {
                 console.error('解析音色数据失败:', e);
             }

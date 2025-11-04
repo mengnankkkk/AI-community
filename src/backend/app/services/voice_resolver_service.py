@@ -15,8 +15,16 @@ class VoiceResolverService:
     """统一音色解析服务"""
 
     def __init__(self):
-        # CosyVoice官方音色映射
+        # CosyVoice官方音色映射（v1和v2通用）
         self.cosyvoice_voices = {
+            # v1音色（不带后缀）
+            "longwan": "龙湾（男声-标准）",
+            "longyuan": "龙渊（男声-浑厚）",
+            "longxiaochun": "龙小春（女声-标准）",
+            "longxiaoxia": "龙小夏（女声-温暖）",
+            "longxiaoyuan": "龙小媛（女声-活力）",
+            "longxiaocheng": "龙小诚（男声-磁性）",
+            # v2音色（带_v2后缀）
             "longwan_v2": "龙湾（男声-标准）",
             "longyuan_v2": "龙渊（男声-浑厚）",
             "longxiaochun_v2": "龙小春（女声-标准）",
@@ -76,79 +84,79 @@ class VoiceResolverService:
         self.voice_keyword_mapping = {
             # 男声特征
             "沉稳": {
-                "cosyvoice": "longwan_v2",
+                "cosyvoice": "longwan",  # v1音色（不带_v2后缀）
                 "openai": "onyx",
                 "qwen3_tts": "Elias / 墨讲师",
                 "nihal_tts": "onyx",
                 "default": "male_steady"
             },
             "浑厚": {
-                "cosyvoice": "longyuan_v2",
+                "cosyvoice": "longyuan",  # v1音色（不带_v2后缀）
                 "openai": "echo",
                 "qwen3_tts": "Marcus / 陕西-秦川",
                 "nihal_tts": "echo",
                 "default": "male_deep"
             },
             "磁性": {
-                "cosyvoice": "longyuan_v2",
+                "cosyvoice": "longyuan",  # v1音色（不带_v2后缀）
                 "openai": "echo",
                 "qwen3_tts": "Elias / 墨讲师",
                 "nihal_tts": "echo",
                 "default": "male_magnetic"
             },
             "男声": {
-                "cosyvoice": "longwan_v2",
+                "cosyvoice": "longwan",  # v1音色（不带_v2后缀）
                 "openai": "fable",
                 "qwen3_tts": "Ethan / 晨煦",
                 "nihal_tts": "fable",
                 "default": "male_standard"
             },
             "男中音": {
-                "cosyvoice": "longwan_v2",
+                "cosyvoice": "longwan",  # v1音色（不带_v2后缀）
                 "openai": "onyx",
                 "qwen3_tts": "Ethan / 晨煦",
                 "nihal_tts": "alloy",
                 "default": "male_baritone"
             },
 
-            # 女声特征
+            # 女声��征
             "清脆": {
-                "cosyvoice": "longxiaochun_v2",
+                "cosyvoice": "longxiaochun",  # v1音色（不带_v2后缀）
                 "openai": "nova",
                 "qwen3_tts": "Cherry / 芊悦",
                 "nihal_tts": "nova",
                 "default": "female_crisp"
             },
             "温暖": {
-                "cosyvoice": "longxiaoxia_v2",
+                "cosyvoice": "longxiaoxia",  # v1音色（不带_v2后缀）
                 "openai": "shimmer",
                 "qwen3_tts": "Jennifer / 詹妮弗",
                 "nihal_tts": "coral",
                 "default": "female_warm"
             },
             "活力": {
-                "cosyvoice": "longxiaoyuan_v2",
+                "cosyvoice": "longxiaoyuan",  # v1音色（不带_v2后缀）
                 "openai": "nova",
                 "qwen3_tts": "Cherry / 芊悦",  # 女声甜美（与cosyvoice保持性别一致）
                 "nihal_tts": "shimmer",
                 "default": "female_energetic"
             },
             "女声": {
-                "cosyvoice": "longxiaochun_v2",
+                "cosyvoice": "longxiaochun",  # v1音色（不带_v2后缀）
                 "openai": "nova",
                 "qwen3_tts": "Cherry / 芊悦",
                 "nihal_tts": "nova",
                 "default": "female_standard"
             },
             "柔和": {
-                "cosyvoice": "longxiaoxia_v2",
+                "cosyvoice": "longxiaoxia",  # v1音色（不带_v2后缀）
                 "openai": "shimmer",
                 "qwen3_tts": "Jennifer / 詹妮弗",
                 "nihal_tts": "shimmer",
                 "default": "female_soft"
             },
             "知性": {
-                "cosyvoice": "longxiaochun_v2",
+                "cosyvoice": "longxiaochun",  # v1音色（不带_v2后缀）
                 "openai": "nova",
                 "qwen3_tts": "Katerina / 卡捷琳娜",
                 "nihal_tts": "sage",
@@ -157,14 +165,14 @@ class VoiceResolverService:
 
             # 通用特征
             "标准": {
-                "cosyvoice": "longwan_v2",  # 男声标准（与qwen3保持性别一致）
+                "cosyvoice": "longwan",  # v1音色（不带_v2后缀，男声标准，与qwen3保持性别一致）
                 "openai": "alloy",
                 "qwen3_tts": "Ethan / 晨煦",
                 "nihal_tts": "alloy",
                 "default": "standard"
             },
             "专业": {
-                "cosyvoice": "longwan_v2",
+                "cosyvoice": "longwan",  # v1音色（不带_v2后缀）
                 "openai": "onyx",
                 "qwen3_tts": "Elias / 墨讲师",
                 "nihal_tts": "onyx",
@@ -193,6 +201,24 @@ class VoiceResolverService:
 
         voice_description = voice_description.strip()
         logger.info(f"解析音色: '{voice_description}' for {tts_engine}")
+
+        # 🔧 向后兼容：自动将v2格式的音色ID转换为v1格式
+        # 移除 _v2 / _v3 后缀，统一使用v1格式（不带后缀）
+        if voice_description.endswith('_v2') or voice_description.endswith('_v3'):
+            original_description = voice_description
+            voice_description = voice_description.replace('_v2', '').replace('_v3', '')
+            logger.info(f"✅ 自动转换音色格式: '{original_description}' -> '{voice_description}' (v2/v3 -> v1)")
+
+        # 🔧 v1模型不支持的音色替代映射
+        # longxiaoyuan（龙小媛-女声活力）在v1中不存在，映射到 longxiaoxia（龙小夏-女声温暖）
+        v1_voice_substitutions = {
+            "longxiaoyuan": "longxiaoxia"  # 女声活力 -> 女声温暖（最接近的女声）
+        }
+
+        if tts_engine.lower() == 'cosyvoice' and voice_description in v1_voice_substitutions:
+            original_voice = voice_description
+            voice_description = v1_voice_substitutions[voice_description]
+            logger.info(f"🔄 v1模型音色替代: '{original_voice}' -> '{voice_description}' (v1不支持原音色)")
 
         # 1. 检查是否是CosyVoice官方音色ID
         if voice_description in self.cosyvoice_voices:
@@ -235,8 +261,16 @@ class VoiceResolverService:
         if tts_engine.lower() == 'cosyvoice':
             return cosyvoice_id, None
 
-        # 根据CosyVoice音色特征映射到其他引擎
+        # 根据CosyVoice音色特征映射到其他引擎（同时支持v1和v2格式）
         voice_mapping = {
+            # v1格式（不带_v2后缀）
+            "longwan": {"openai": "onyx", "default": "male_steady"},
+            "longyuan": {"openai": "echo", "default": "male_deep"},
+            "longxiaochun": {"openai": "nova", "default": "female_standard"},
+            "longxiaoxia": {"openai": "shimmer", "default": "female_warm"},
+            "longxiaoyuan": {"openai": "nova", "default": "female_energetic"},
+            "longxiaocheng": {"openai": "echo", "default": "male_magnetic"},
+            # v2格式（带_v2后缀，向后兼容）
             "longwan_v2": {"openai": "onyx", "default": "male_steady"},
             "longyuan_v2": {"openai": "echo", "default": "male_deep"},
             "longxiaochun_v2": {"openai": "nova", "default": "female_standard"},
@@ -256,14 +290,14 @@ class VoiceResolverService:
         if tts_engine.lower() == 'openai':
             return openai_voice, None
 
-        # 映射到CosyVoice
+        # 映射到CosyVoice（使用v1格式，不带_v2后缀）
         openai_to_cosyvoice = {
-            "onyx": "longwan_v2",
-            "echo": "longyuan_v2",
-            "fable": "longwan_v2",
-            "nova": "longxiaoyuan_v2",
-            "shimmer": "longxiaoxia_v2",
-            "alloy": "longxiaochun_v2"
+            "onyx": "longwan",
+            "echo": "longyuan",
+            "fable": "longwan",
+            "nova": "longxiaoyuan",
+            "shimmer": "longxiaoxia",
+            "alloy": "longxiaochun"
         }
 
         # 映射到Qwen3
@@ -277,7 +311,7 @@ class VoiceResolverService:
         }
 
         if tts_engine.lower() == 'cosyvoice':
-            return openai_to_cosyvoice.get(openai_voice, "longxiaochun_v2"), None
+            return openai_to_cosyvoice.get(openai_voice, "longxiaochun"), None
         elif tts_engine.lower() == 'qwen3_tts':
             return openai_to_qwen3.get(openai_voice, "Cherry / 芊悦"), None
         elif tts_engine.lower() == 'nihal_tts':
@@ -291,14 +325,14 @@ class VoiceResolverService:
         if tts_engine.lower() == 'qwen3_tts':
             return qwen3_voice, None
 
-        # 映射到CosyVoice
+        # 映射到CosyVoice（使用v1格式，不带_v2后缀）
         qwen3_to_cosyvoice = {
-            "Cherry / 芊悦": "longxiaochun_v2",
-            "Ethan / 晨煦": "longwan_v2",
-            "Jennifer / 詹妮弗": "longxiaoxia_v2",
-            "Ryan / 甜茶": "longxiaoyuan_v2",
-            "Katerina / 卡捷琳娜": "longxiaochun_v2",
-            "Elias / 墨讲师": "longwan_v2",
+            "Cherry / 芊悦": "longxiaochun",
+            "Ethan / 晨煦": "longwan",
+            "Jennifer / 詹妮弗": "longxiaoxia",
+            "Ryan / 甜茶": "longxiaoyuan",
+            "Katerina / 卡捷琳娜": "longxiaochun",
+            "Elias / 墨讲师": "longwan",
         }
 
         # 映射到OpenAI
@@ -312,7 +346,7 @@ class VoiceResolverService:
         }
 
         if tts_engine.lower() == 'cosyvoice':
-            return qwen3_to_cosyvoice.get(qwen3_voice, "longxiaochun_v2"), None
+            return qwen3_to_cosyvoice.get(qwen3_voice, "longxiaochun"), None
         elif tts_engine.lower() == 'openai':
             return qwen3_to_openai.get(qwen3_voice, "alloy"), None
         elif tts_engine.lower() == 'nihal_tts':
@@ -357,26 +391,88 @@ class VoiceResolverService:
         return self._get_default_voice(tts_engine), None
 
     def _map_by_keywords(self, description: str, tts_engine: str) -> Optional[str]:
-        """通过关键词映射音色"""
+        """通过关键词映射音色（支持性别优先级判断）"""
         description_lower = description.lower()
 
-        for keyword, engine_map in self.voice_keyword_mapping.items():
+        # 定义性别关键词
+        male_keywords = ["男声", "男", "male", "男中音"]
+        female_keywords = ["女声", "女", "female"]
+
+        # 检测性别偏好
+        detected_gender = None
+        for keyword in male_keywords:
             if keyword in description_lower:
+                detected_gender = "male"
+                break
+
+        if not detected_gender:
+            for keyword in female_keywords:
+                if keyword in description_lower:
+                    detected_gender = "female"
+                    break
+
+        # 定义各引擎的性别音色分类
+        gender_voice_map = {
+            "cosyvoice": {
+                "male": ["longwan", "longyuan"],  # v1音色（不带_v2后缀）
+                "female": ["longxiaochun", "longxiaoxia", "longxiaoyuan"]  # v1音色（不带_v2后缀）
+            },
+            "openai": {
+                "male": ["onyx", "echo", "fable"],
+                "female": ["nova", "shimmer", "alloy"]
+            },
+            "qwen3_tts": {
+                "male": ["Ethan / 晨煦", "Elias / 墨讲师", "Ryan / 甜茶", "Li / 南京-老李", "Marcus / 陕西-秦川", "Roy / 闽南-阿杰", "Peter / 天津-李彼得", "Eric / 四川-程川", "Rocky / 粤语-阿强", "Dylan / 北京-晓东"],
+                "female": ["Cherry / 芊悦", "Jennifer / 詹妮弗", "Katerina / 卡捷琳娜", "Kiki / 粤语-阿清", "Sunny / 四川-晴儿", "Jada / 上海-阿珍"]
+            },
+            "nihal_tts": {
+                "male": ["onyx", "echo", "fable", "ash", "sage"],
+                "female": ["nova", "shimmer", "coral", "verse", "ballad"]
+            }
+        }
+
+        # 遍历关键词进行匹配
+        for keyword, engine_map in self.voice_keyword_mapping.items():
+            # 跳过性别关键词本身（已在上面处理）
+            if keyword in male_keywords + female_keywords:
+                continue
+
+            if keyword in description_lower:
+                # 获取该关键词对应的音色ID
                 if tts_engine.lower() in engine_map:
-                    return engine_map[tts_engine.lower()]
+                    voice_id = engine_map[tts_engine.lower()]
                 elif tts_engine.lower() == 'cosyvoice' and 'cosyvoice' in engine_map:
-                    return engine_map['cosyvoice']
+                    voice_id = engine_map['cosyvoice']
                 elif tts_engine.lower() == 'openai' and 'openai' in engine_map:
-                    return engine_map['openai']
+                    voice_id = engine_map['openai']
                 else:
-                    return engine_map.get('default')
+                    voice_id = engine_map.get('default')
+
+                # 如果检测到性别偏好，验证音色是否符合性别
+                if detected_gender and tts_engine.lower() in gender_voice_map:
+                    gender_voices = gender_voice_map[tts_engine.lower()].get(detected_gender, [])
+
+                    # 如果当前音色不符合性别，寻找符合性别的替代音色
+                    if voice_id not in gender_voices and gender_voices:
+                        logger.info(f"音色 '{voice_id}' 不符合性别 '{detected_gender}'，使用该性别的默认音色")
+                        # 返回该性别的第一个音色（默认音色）
+                        return gender_voices[0]
+
+                return voice_id
+
+        # 如果只有性别关键词，没有风格关键词，返回该性别的默认音色
+        if detected_gender and tts_engine.lower() in gender_voice_map:
+            gender_voices = gender_voice_map[tts_engine.lower()].get(detected_gender, [])
+            if gender_voices:
+                logger.info(f"仅检测到性别 '{detected_gender}'，使用默认音色: {gender_voices[0]}")
+                return gender_voices[0]
 
         return None
 
     def _get_default_voice(self, tts_engine: str) -> str:
         """获取引擎的默认音色"""
         defaults = {
-            "cosyvoice": "longxiaochun_v2",  # 龙小春（女声-标准）
+            "cosyvoice": "longxiaochun",  # 龙小春（女声-标准，v1格式不带_v2后缀）
             "openai": "alloy",
             "qwen3_tts": "Cherry / 芊悦",  # Qwen3默认女声
             "nihal_tts": "alloy",  # Nihal默认标准男声

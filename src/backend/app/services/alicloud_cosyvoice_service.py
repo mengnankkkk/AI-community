@@ -45,17 +45,28 @@ class AliCloudCosyVoiceService:
         self._configure_ffmpeg()
 
         # 模型配置
-        self.model = getattr(settings, 'cosyvoice_model', 'cosyvoice-v2')
-        self.default_voice = getattr(settings, 'cosyvoice_default_voice', 'longxiaochun_v2')
+        self.model = getattr(settings, 'cosyvoice_model', 'cosyvoice-v1')  # 默认使用v1（更稳定）
+        self.default_voice = getattr(settings, 'cosyvoice_default_voice', 'longxiaochun')  # v1音色
 
-        # 常用CosyVoice音色列表
-        self.available_voices = [
-            "longwan_v2",           # 男声-标准
-            "longyuan_v2",          # 男声-浑厚
-            "longxiaochun_v2",      # 女声-标准
-            "longxiaoxia_v2",       # 女声-温暖
-            "longxiaoyuan_v2",      # 女声-活力
-        ]
+        # 根据模型版本确定可用音色
+        if 'v2' in self.model or 'v3' in self.model:
+            # v2/v3模型：音色ID带_v2/_v3后缀
+            self.available_voices = [
+                "longwan_v2", "longyuan_v2",
+                "longxiaochun_v2", "longxiaoxia_v2", "longxiaoyuan_v2"
+            ]
+            self.voice_suffix = "_v2"
+        else:
+            # v1模型：音色ID不带后缀
+            # 注意：v1模型支持 longxiaocheng（男声磁性），不支持 longxiaoyuan（女声活力）
+            self.available_voices = [
+                "longwan", "longyuan",
+                "longxiaochun", "longxiaoxia", "longxiaocheng"
+            ]
+            self.voice_suffix = ""
+
+        logger.info(f"CosyVoice配置: model={self.model}, default_voice={self.default_voice}")
+        logger.info(f"可用音色: {self.available_voices}")
 
     def _configure_ffmpeg(self):
         """配置FFmpeg路径供pydub使用"""
@@ -91,18 +102,30 @@ class AliCloudCosyVoiceService:
     def get_voice_for_character(self, voice_description: str) -> str:
         """根据音色描述选择合适的CosyVoice音色（使用统一音色解析服务）"""
         if not voice_description:
+            logger.warning(f"音色描述为空，使用默认音色: {self.default_voice}")
             return self.default_voice
+
+        # 记录原始输入
+        logger.info(f"[音色解析] 原始描述: '{voice_description}'")
 
         # 使用统一的音色解析服务
         voice_id, voice_file = voice_resolver.resolve_voice(voice_description, "cosyvoice")
 
+        # 记录解析结果
+        logger.info(f"[音色解析] 解析结果: voice_id='{voice_id}', voice_file='{voice_file}'")
+        logger.info(f"[音色解析] 可用音色列表: {self.available_voices}")
+
         # CosyVoice只使用音色ID
         if voice_id in self.available_voices:
-            logger.info(f"使用CosyVoice音色: {voice_id}")
+            logger.info(f"✅ 使用CosyVoice音色: {voice_id}")
             return voice_id
 
         # 如果解析的音色ID不在可用列表中，使用默认
-        logger.warning(f"音色 '{voice_id}' 不是有效的CosyVoice音色，使用默认: {self.default_voice}")
+        logger.error(f"❌ 音色 '{voice_id}' 不是有效的CosyVoice音色！")
+        logger.error(f"   原始描述: '{voice_description}'")
+        logger.error(f"   解析结果: '{voice_id}'")
+        logger.error(f"   可用音色: {self.available_voices}")
+        logger.error(f"   → 使用默认音色: {self.default_voice}")
         return self.default_voice
 
     async def synthesize_single_audio(self, text: str, voice: str) -> Tuple[bool, Optional[bytes]]:
@@ -118,6 +141,9 @@ class AliCloudCosyVoiceService:
 
         for attempt in range(1, max_retries + 1):
             try:
+                # 记录请求参数，方便排查问题
+                logger.info(f"[CosyVoice] 请求参数: model={self.model}, voice={voice}, text_length={len(cleaned_text)}")
+
                 synthesizer = SpeechSynthesizer(
                     model=self.model,
                     voice=voice
@@ -126,16 +152,39 @@ class AliCloudCosyVoiceService:
                 # call为同步阻塞，放入线程池避免阻塞事件循环
                 audio_data = await asyncio.to_thread(synthesizer.call, cleaned_text)
 
+                # 检查返回的音频数据是否有效
+                if audio_data is None:
+                    error_msg = f"CosyVoice返回了None（可能是API错误或参数无效）"
+                    logger.error(f"❌ {error_msg}")
+                    logger.error(f"   音色: {voice}, 文本: {cleaned_text[:100]}")
+                    raise ValueError(error_msg)
+
+                if not isinstance(audio_data, bytes) or len(audio_data) == 0:
+                    error_msg = f"CosyVoice返回了无效数据: type={type(audio_data)}, length={len(audio_data) if audio_data else 0}"
+                    logger.error(f"❌ {error_msg}")
+                    raise ValueError(error_msg)
+
                 logger.info(
                     f'[Metric] requestId: {synthesizer.get_last_request_id()}, '
                     f'首包延迟: {synthesizer.get_first_package_delay()}ms'
                 )
-                logger.info(f"✅ CosyVoice音频合成成功，数据大小: {len(audio_data)} bytes")
+                logger.info(f"✅ CosyVoice音频���成成功，数据大小: {len(audio_data)} bytes")
                 return True, audio_data
 
             except Exception as error:  # noqa: BLE001 - 需捕捉SDK内部异常
                 last_error = error
                 message = str(error)
+
+                # 检查是否是418错误（参数无效）
+                if "418" in message or "InvalidParameter" in message:
+                    logger.error(f"❌ CosyVoice参数错误 (418): {message}")
+                    logger.error(f"   可能的原因:")
+                    logger.error(f"   1. 音色ID '{voice}' 不正确或不支持")
+                    logger.error(f"   2. 文本内容有问题: {cleaned_text[:100]}")
+                    logger.error(f"   3. 模型 '{self.model}' 配置错误")
+                    logger.error(f"   建议检查 .env 中的 COSYVOICE_MODEL 和音色配置")
+                    # 418错误不重试，直接失败
+                    break
 
                 connection_issue = any(
                     keyword in message.lower()

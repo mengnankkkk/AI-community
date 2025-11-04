@@ -19,11 +19,11 @@ class VoiceInfo(BaseModel):
     sample_url: Optional[str] = None  # 音色样本URL
 
 
-# 阿里云 CosyVoice 音色库配置
+# 阿里云 CosyVoice 音色库配置（v1格式，不带_v2后缀）
 COSYVOICE_VOICE_LIBRARY = {
     # 男声 - 标准
-    "longwan_v2": VoiceInfo(
-        id="longwan_v2",
+    "longwan": VoiceInfo(
+        id="longwan",
         name="龙湾",
         name_en="Longwan",
         gender="male",
@@ -34,8 +34,8 @@ COSYVOICE_VOICE_LIBRARY = {
     ),
 
     # 男声 - 浑厚
-    "longyuan_v2": VoiceInfo(
-        id="longyuan_v2",
+    "longyuan": VoiceInfo(
+        id="longyuan",
         name="龙渊",
         name_en="Longyuan",
         gender="male",
@@ -46,8 +46,8 @@ COSYVOICE_VOICE_LIBRARY = {
     ),
 
     # 女声 - 标准
-    "longxiaochun_v2": VoiceInfo(
-        id="longxiaochun_v2",
+    "longxiaochun": VoiceInfo(
+        id="longxiaochun",
         name="龙小春",
         name_en="Longxiaochun",
         gender="female",
@@ -58,8 +58,8 @@ COSYVOICE_VOICE_LIBRARY = {
     ),
 
     # 女声 - 温暖
-    "longxiaoxia_v2": VoiceInfo(
-        id="longxiaoxia_v2",
+    "longxiaoxia": VoiceInfo(
+        id="longxiaoxia",
         name="龙小夏",
         name_en="Longxiaoxia",
         gender="female",
@@ -70,8 +70,8 @@ COSYVOICE_VOICE_LIBRARY = {
     ),
 
     # 女声 - 活力
-    "longxiaoyuan_v2": VoiceInfo(
-        id="longxiaoyuan_v2",
+    "longxiaoyuan": VoiceInfo(
+        id="longxiaoyuan",
         name="龙小媛",
         name_en="Longxiaoyuan",
         gender="female",
@@ -87,11 +87,11 @@ COSYVOICE_VOICE_LIBRARY = {
 VOICE_CATEGORIES = {
     "male": {
         "name": "男声",
-        "voices": ["longwan_v2", "longyuan_v2"]
+        "voices": ["longwan", "longyuan"]  # v1格式（不带_v2后缀）
     },
     "female": {
         "name": "女声",
-        "voices": ["longxiaochun_v2", "longxiaoxia_v2", "longxiaoyuan_v2"]
+        "voices": ["longxiaochun", "longxiaoxia", "longxiaoyuan"]  # v1格式（不带_v2后缀）
     }
 }
 
@@ -100,17 +100,17 @@ VOICE_CATEGORIES = {
 VOICE_STYLES = {
     "professional": {
         "name": "专业权威",
-        "voices": ["longwan_v2", "longyuan_v2"],
+        "voices": ["longwan", "longyuan"],  # v1格式（不带_v2后缀）
         "description": "适合专业讨论、商业内容、学术分享"
     },
     "friendly": {
         "name": "亲切温暖",
-        "voices": ["longxiaochun_v2", "longxiaoxia_v2"],
+        "voices": ["longxiaochun", "longxiaoxia"],  # v1格式（不带_v2后缀）
         "description": "适合日常对话、生活分享、情感内容"
     },
     "energetic": {
         "name": "活力青春",
-        "voices": ["longxiaoyuan_v2"],
+        "voices": ["longxiaoyuan"],  # v1格式（不带_v2后缀）
         "description": "适合轻松话题、娱乐内容、年轻群体"
     }
 }
@@ -121,28 +121,28 @@ SCENE_RECOMMENDATIONS = {
     "academic": {
         "name": "学术讨论",
         "recommended_voices": {
-            "host": ["longwan_v2", "longyuan_v2"],
-            "guest": ["longxiaochun_v2"]
+            "host": ["longwan", "longyuan"],  # v1格式（不带_v2后缀）
+            "guest": ["longxiaochun"]  # v1格式（不带_v2后缀）
         }
     },
     "business": {
         "name": "商业访谈",
         "recommended_voices": {
-            "host": ["longwan_v2", "longyuan_v2"],
-            "guest": ["longxiaochun_v2", "longxiaoxia_v2"]
+            "host": ["longwan", "longyuan"],  # v1格式（不带_v2后缀）
+            "guest": ["longxiaochun", "longxiaoxia"]  # v1格式（不带_v2后缀）
         }
     },
     "casual": {
         "name": "轻松闲聊",
         "recommended_voices": {
-            "host": ["longxiaoyuan_v2", "longxiaoxia_v2"],
-            "guest": ["longwan_v2", "longxiaochun_v2"]
+            "host": ["longxiaoyuan", "longxiaoxia"],  # v1格式（不带_v2后缀）
+            "guest": ["longwan", "longxiaochun"]  # v1格式（不带_v2后缀）
         }
     },
     "news": {
         "name": "新闻播报",
         "recommended_voices": {
-            "anchor": ["longwan_v2", "longxiaochun_v2"]
+            "anchor": ["longwan", "longxiaochun"]  # v1格式（不带_v2后缀）
         }
     }
 }
